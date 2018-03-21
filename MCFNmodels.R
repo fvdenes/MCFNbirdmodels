@@ -5,6 +5,7 @@ library(opticut)
 load("C:/Users/voeroesd/Dropbox/BAM/Critical Habitat/CHID subunit delineation/pack_2016-12-01.Rdata")
 
 
+
 # import buffers to crop data
 BUFF0 <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/BAM_pts_wBuff0.csv", sep="", stringsAsFactors=FALSE)
 BUFF50 <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/BAM_pts_wBuff50000.csv", sep="", stringsAsFactors=FALSE)
@@ -20,7 +21,7 @@ BUFF500 <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/BAM_pts_wBuff500000.csv"
 
 
 
-#DAT$ROAD<-factor(DAT$ROAD) ##
+DAT$ROAD<-factor(DAT$ROAD)
 DAT$HAB_NALC1 <- DAT$HABTR
 DAT$HAB_NALC2 <- DAT$HAB
 DAT$YEAR <- DAT$YR+2013
@@ -97,7 +98,7 @@ model_1 <- function(spp, buffer = NULL) {
   road_table <- table(mmi@samp$ROAD)
   ol <- find_levels(spp, m=1000) # use subset of offroad data
   rc <- ol$levels[[length(ol$levels)]]
-  #ff <- y ~ x + ROAD + CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT
+  #ff <- y ~ x + ROAD + CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # 
   ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT
   y <- as.numeric(xtab(mmi)[,spp])
   x <- droplevels(samp(mmi)$HAB_NALC1)
