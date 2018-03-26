@@ -151,8 +151,8 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
     ff <- y ~ x + ROAD + CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # with road
     y <- as.numeric(xtab(mmi)[,spp])
     x <- droplevels(samp(mmi)$HAB_NALC1)
-    if (!is.null(reclass))
-      levels(x) <- rc[levels(x)]
+    levels(x) <- rc[levels(x)]
+    
     if(spp%in%colnames(OFF)==T){
       model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)), keep_call=FALSE, vcov=TRUE)
       #if running model with ROAD covariate returns NA road coef, check variable format (should be factor), then road_table object to see on and off road proportions
@@ -167,8 +167,7 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
     ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # without road
     y <- as.numeric(xtab(mmi)[,spp])
     x <- droplevels(samp(mmi)$HAB_NALC1)
-    if (!is.null(reclass))
-      levels(x) <- rc[levels(x)]
+    levels(x) <- rc[levels(x)]
     if(spp%in%colnames(OFF)==T){
       model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)), keep_call=FALSE, vcov=TRUE)
     }
@@ -232,84 +231,6 @@ mods_CONI <- modelallbuffers(spp="CONI", road="no",maxit=100)
 mods_CONI$buffer300$model
 
 
-
-## just glm results
-
-
-model_glm <- function(spp, buffer = NULL, road="no", maxit=25) {
-  if(is.null(buffer)==T){
-    mmi<-mm }  
-  else{
-    mmi<- mm[samp(mm)$SS%in% buffer$SS ,]}
-  road_table <- table(mmi@samp$ROAD)
-  
-  set.seed(1)
-  
-  find_levels <- function(spp, m=1000) {
-    j <- rep(FALSE, nrow(mm))
-    for (k in levels(droplevels(samp(mm)$HAB_NALC1))) {
-      w <- which(samp(mm)$HAB_NALC1 == k)
-      if (length(w) < m) {
-        j[w] <- TRUE
-      } else {
-        j[sample(w, m)] <- TRUE
-      }
-    }
-    mm <- mm[j,]
-    y <- as.numeric(xtab(mm)[,spp])
-    x <- droplevels(samp(mm)$HAB_NALC1)
-    if(spp%in%colnames(OFF)==T){
-      ol <- optilevels(y=y, x=x, dist="poisson", offset=OFF[rownames(mm),spp])
-    }
-    else{
-      ol <- optilevels(y=y, x=x, dist="poisson")
-    }
-    ol
-  }
-  
-  
-  ol <- find_levels(spp, m=1000) # use subset of offroad data
-  rc <- ol$levels[[length(ol$levels)]]
-  
-  if(road=="yes"){
-    ff <- y ~ x + ROAD + CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # with road
-    y <- as.numeric(xtab(mmi)[,spp])
-    x <- droplevels(samp(mmi)$HAB_NALC1)
-    if (!is.null(reclass))
-      levels(x) <- rc[levels(x)]
-    if(spp%in%colnames(OFF)==T){
-      model<- glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)
-      #if running model with ROAD covariate returns NA road coef, check variable format (should be factor), then road_table object to see on and off road proportions
-    }
-    else{
-      model<- glm(ff, data=samp(mmi),family="poisson", maxit=maxit)
-      #if running model with ROAD covariate returns NA road coef, check variable format (should be factor), then road_table object to see on and off road proportions
-    } 
-  }
-  
-  if(road=="no"){
-    ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # without road
-    y <- as.numeric(xtab(mmi)[,spp])
-    x <- droplevels(samp(mmi)$HAB_NALC1)
-    if (!is.null(reclass))
-      levels(x) <- rc[levels(x)]
-    if(spp%in%colnames(OFF)==T){
-      model<- glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)
-    }
-    else{
-      model<- glm(ff, data=samp(mmi),family="poisson", maxit=maxit)
-    }
-    
-  }
-  
-  out<-list(spp=spp,
-            levels=ol,
-            model=model)
-  out
-}
-
-
-
 # Run model for all buffers
 
 
@@ -345,7 +266,25 @@ modelallbuffers <- function(spp,road="no",maxit=25){
 
 
 mods_CAWA <- modelallbuffers(spp="CAWA", road="no",maxit=100)
-mods_CAWA$buffer100$model
+summary(mods_CAWA$buffer100$model)
+
+
+rc_pred<-function(modlistbuffer,preddata){
+  rc<-modlistbuffer$levels$levels[[length(modlistbuffer$levels$levels)]]
+  x <- droplevels(preddata$HAB_NALC1)
+  levels(x) <- rc[levels(x)]
+  preddata$x<-x
+  preddata
+ 
+}
+
+rc_pred_CAWA_250<-rc_pred(mods_CAWA$buffer250,pred_data)
+
+x<- model.matrix(ff,data.frame(y=1,rc_pred_CAWA_250))
+x%*%mods_CAWA$buffer250$model$coef
+
+
+
 
 mods_OSFL <- modelallbuffers(spp="OSFL", road="no",maxit=100)
 mods_OSFL$buffer100$model
@@ -390,7 +329,7 @@ ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + 
 
 predict(mods_CAWA$buffer0$model,newdata=pred_data)
 
-mods_CAWA$buffer0$levels$
+mods_CAWA$buffer0$levels$levels
 
 
 
