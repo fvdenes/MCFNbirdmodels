@@ -122,20 +122,20 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
   set.seed(1)
   
   find_levels <- function(spp, m=1000) {
-    j <- rep(FALSE, nrow(mm))
-    for (k in levels(droplevels(samp(mm)$HAB_NALC1))) {
-      w <- which(samp(mm)$HAB_NALC1 == k)
+    j <- rep(FALSE, nrow(mmi))
+    for (k in levels(droplevels(samp(mmi)$HAB_NALC1))) {
+      w <- which(samp(mmi)$HAB_NALC1 == k)
       if (length(w) < m) {
         j[w] <- TRUE
       } else {
         j[sample(w, m)] <- TRUE
       }
     }
-    mm <- mm[j,]
-    y <- as.numeric(xtab(mm)[,spp])
-    x <- droplevels(samp(mm)$HAB_NALC1)
+    mmi <- mmi[j,]
+    y <- as.numeric(xtab(mmi)[,spp])
+    x <- droplevels(samp(mmi)$HAB_NALC1)
     if(spp%in%colnames(OFF)==T){
-        ol <- optilevels(y=y, x=x, dist="poisson", offset=OFF[rownames(mm),spp])
+        ol <- optilevels(y=y, x=x, dist="poisson", offset=OFF[rownames(mmi),spp])
     }
     else{
         ol <- optilevels(y=y, x=x, dist="poisson")
@@ -231,60 +231,85 @@ mods_CONI <- modelallbuffers(spp="CONI", road="no",maxit=100)
 mods_CONI$buffer300$model
 
 
-# Run model for all buffers
 
 
-modelallbuffers <- function(spp,road="no",maxit=25){
-  t0 <- proc.time()
-  mbuf0<-model_glm(spp = spp, buffer=BUFF0, road=road)
-  mbuf50<-model_glm(spp = spp, buffer=BUFF50, road=road)
-  mbuf100<-model_glm(spp = spp, buffer=BUFF100, road=road)
-  mbuf150<-model_glm(spp = spp, buffer=BUFF150, road=road)
-  mbuf200<-model_glm(spp = spp, buffer=BUFF200, road=road)
-  mbuf250<-model_glm(spp = spp, buffer=BUFF250, road=road)
-  mbuf300<-model_glm(spp = spp, buffer=BUFF300, road=road)
-  mbuf350<-model_glm(spp = spp, buffer=BUFF350, road=road)
-  mbuf400<-model_glm(spp = spp, buffer=BUFF400, road=road)
-  mbuf450<-model_glm(spp = spp, buffer=BUFF450, road=road)
-  mbuf500<-model_glm(spp = spp, buffer=BUFF500, road=road)
+# Load prediction dataset: MCFN homelands
+pred_data <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/output/BAM_pred_data_wBuff0.csv", sep="")
+str(pred_data)
+
+modlist<-mods_CAWA
+preddata<-pred_data
+
+
+get_preds <- function(modlist,preddata){
   
-  out<- list(spp=spp,
-             time=as.numeric(proc.time() - t0)[3L],
-             buffer0=mbuf0,
-             buffer50=mbuf50,
-             buffer100=mbuf100,
-             buffer150=mbuf150,
-             buffer200=mbuf200,
-             buffer250=mbuf250,
-             buffer300=mbuf300,
-             buffer350=mbuf350,
-             buffer400=mbuf400,
-             buffer450=mbuf450,
-             buffer500=mbuf500)
-  out
-}
-
-
-mods_CAWA <- modelallbuffers(spp="CAWA", road="no",maxit=100)
-summary(mods_CAWA$buffer100$model)
-
-
-rc_pred<-function(modlistbuffer,preddata){
-  rc<-modlistbuffer$levels$levels[[length(modlistbuffer$levels$levels)]]
-  x <- droplevels(preddata$HAB_NALC1)
-  levels(x) <- rc[levels(x)]
-  preddata$x<-x
-  preddata
+  # Reclass land cover variable in prediction dataset according to reclassing done for model
+  rc_pred<-function(modlistbuffer,preddata){
+    rc<-modlistbuffer$levels$levels[[length(modlistbuffer$levels$levels)]]
+    x <- droplevels(preddata$HAB_NALC1)
+    levels(x) <- rc[levels(x)]
+    preddata$x<-x
+    preddata$x<-relevel(preddata$x,rc[1])
+    preddata
+    }
+  
+  rc_preddata<- lapply(modlist[-c(1,2)],rc_pred,preddata)
+    
+  rc_preddata<- lapply(rc_preddata,data.frame,y=1) # add intercept (y=1) column
+  
+  ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # model formula without road
+  
+  mod_matrix_pred<-lapply(rc_preddata,model.matrix,object=ff) # generate model matrix
+  
+  #####
+  getCoef<- function(modlistbuffer){
+    coef<-modlistbuffer$model$coef
+    coef
+  }
+  coefs <-lapply(modlist[-c(1,2)],getCoef)
+  
+  ests<-data.frame(buffer0=rep(NA,nrow(rc_preddata$buffer0)),
+                   buffer50=rep(NA,nrow(rc_preddata$buffer50)),
+                   buffer100=rep(NA,nrow(rc_preddata$buffer100)),
+                   buffer150=rep(NA,nrow(rc_preddata$buffer150)),
+                   buffer200=rep(NA,nrow(rc_preddata$buffer200)),
+                   buffer250=rep(NA,nrow(rc_preddata$buffer250)),
+                   buffer300=rep(NA,nrow(rc_preddata$buffer300)),
+                   buffer350=rep(NA,nrow(rc_preddata$buffer350)),
+                   buffer400=rep(NA,nrow(rc_preddata$buffer400)),
+                   buffer450=rep(NA,nrow(rc_preddata$buffer450)),
+                   buffer500=rep(NA,nrow(rc_preddata$buffer500)))
+  for (i in 1:length(coefs)){
+    ests[,i]<- mod_matrix_pred[[i]]%*%coefs[[i]]
+  }
  
 }
 
-rc_pred_CAWA_250<-rc_pred(mods_CAWA$buffer250,pred_data)
 
+
+model.matrix(ff,rc_preddata$buffer0)
+
+modlist<-mods_CAWA
+preddata<-rc_pred_CAWA_250
+
+mods_CAWA$buffer0$levels$levels
+str(rc_preddata)
+
+levels(rc_preddata$x)
+
+
+rc_pred_RUBL_250<-rc_pred(mods_RUBL$buffer250,pred_data)
+# Predict density
+ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # model formula without road
 x<- model.matrix(ff,data.frame(y=1,rc_pred_CAWA_250))
-x%*%mods_CAWA$buffer250$model$coef
 
 
 
+
+x%*%mods_RUBL$buffer250$model$coef # this is in ha. need to convert to km2
+
+
+cbind(attr(mod_matrix_pred, "dimnames")[[2]],attr(mods_CAWA$buffer250$model$coef,"names"))
 
 mods_OSFL <- modelallbuffers(spp="OSFL", road="no",maxit=100)
 mods_OSFL$buffer100$model
@@ -319,9 +344,6 @@ ests_CIs(mods_CAWA$buffer450$model)
 ests_CIs(mods_CAWA$buffer500$model)
 
 
-# Load prediction dataset: MCFN homelands
-pred_data <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/output/BAM_pred_data_wBuff0.csv", sep="")
-str(pred_data)
 
 
 ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT
