@@ -55,62 +55,7 @@ mm <- mm[!is.na(samp(mm)$HAB_NALC1),]
 
 
 
-# helper functions
-
-
-find_levels <- function(spp, m=1000) {
-  j <- rep(FALSE, nrow(mm))
-  for (k in levels(droplevels(samp(mm)$HAB_NALC1))) {
-    w <- which(samp(mm)$HAB_NALC1 == k)
-    if (length(w) < m) {
-      j[w] <- TRUE
-    } else {
-      j[sample(w, m)] <- TRUE
-    }
-  }
-  mm <- mm[j,]
-  y <- as.numeric(xtab(mm)[,spp])
-  x <- droplevels(samp(mm)$HAB_NALC1)
-  ol <- optilevels(y=y, x=x, dist="poisson", offset=OFF[rownames(mm),spp])
-  ol
-}
-'logLik.try-error' <- function (object, ...) {
-    structure(-.Machine$double.xmax^(1/3), df = 1,
-        nobs = 1, class = "logLik")
-}
-logLik.glm_skeleton <- function (object, ...) {
-    structure(object$logLik, df = object$df,
-        nobs = object$nobs, class = "logLik")
-}
-glm_skeleton <- function(object, ..., CAICalpha=0.5, keep_call=TRUE, vcov=FALSE) {
-    if (inherits(object, "try-error"))
-        return(structure(as.character(object), class="try-error"))
-    out <- structure(list(
-        call=object$call,
-        formula=formula(object),
-        coef=coef(object),
-        vcov=NULL,
-        converge=object$converge,
-        logLik=as.numeric(logLik(object)),
-        df=attr(logLik(object), "df"),
-        nobs=nobs(object)), class="glm_skeleton")
-    if (!out$converge)
-        return(structure("glm did not converge", class="try-error"))
-    if (!keep_call) {
-        out$call <- out$formula <- NULL
-    }
-    if (vcov)
-        out$vcov <- vcov(object)
-    out$class0 <- class(object)[1L]
-    out$aic <- -2*out$logLik + 2*out$df
-    out$bic <- -2*out$logLik + log(out$nobs)*out$df
-    out$caic <- CAICalpha * out$aic + (1-CAICalpha) * out$bic
-    out
-}
-
-
 # Model function
-
 
 model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
   if(is.null(buffer)==T){
@@ -121,28 +66,61 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
   
   set.seed(1)
   
+  #helper functions:
   find_levels <- function(spp, m=1000) {
-    j <- rep(FALSE, nrow(mmi))
-    for (k in levels(droplevels(samp(mmi)$HAB_NALC1))) {
-      w <- which(samp(mmi)$HAB_NALC1 == k)
+    j <- rep(FALSE, nrow(mm))
+    for (k in levels(droplevels(samp(mm)$HAB_NALC1))) {
+      w <- which(samp(mm)$HAB_NALC1 == k)
       if (length(w) < m) {
         j[w] <- TRUE
       } else {
         j[sample(w, m)] <- TRUE
       }
     }
-    mmi <- mmi[j,]
-    y <- as.numeric(xtab(mmi)[,spp])
-    x <- droplevels(samp(mmi)$HAB_NALC1)
+    mm <- mm[j,]
+    y <- as.numeric(xtab(mm)[,spp])
+    x <- droplevels(samp(mm)$HAB_NALC1)
     if(spp%in%colnames(OFF)==T){
-        ol <- optilevels(y=y, x=x, dist="poisson", offset=OFF[rownames(mmi),spp])
+        ol <- optilevels(y=y, x=x, dist="poisson", offset=OFF[rownames(mm),spp])
     }
     else{
         ol <- optilevels(y=y, x=x, dist="poisson")
     }
     ol
   }
-  
+  'logLik.try-error' <- function (object, ...) {
+    structure(-.Machine$double.xmax^(1/3), df = 1,
+              nobs = 1, class = "logLik")
+  }
+  logLik.glm_skeleton <- function (object, ...) {
+    structure(object$logLik, df = object$df,
+              nobs = object$nobs, class = "logLik")
+  }
+  glm_skeleton <- function(object, ..., CAICalpha=0.5, keep_call=TRUE, vcov=FALSE) {
+    if (inherits(object, "try-error"))
+      return(structure(as.character(object), class="try-error"))
+    out <- structure(list(
+      call=object$call,
+      formula=formula(object),
+      coef=coef(object),
+      vcov=NULL,
+      converge=object$converge,
+      logLik=as.numeric(logLik(object)),
+      df=attr(logLik(object), "df"),
+      nobs=nobs(object)), class="glm_skeleton")
+    if (!out$converge)
+      return(structure("glm did not converge", class="try-error"))
+    if (!keep_call) {
+      out$call <- out$formula <- NULL
+    }
+    if (vcov)
+      out$vcov <- vcov(object)
+    out$class0 <- class(object)[1L]
+    out$aic <- -2*out$logLik + 2*out$df
+    out$bic <- -2*out$logLik + log(out$nobs)*out$df
+    out$caic <- CAICalpha * out$aic + (1-CAICalpha) * out$bic
+    out
+  }
   
   ol <- find_levels(spp, m=1000) # use subset of offroad data
   rc <- ol$levels[[length(ol$levels)]]
@@ -179,7 +157,9 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
   
   out<-list(spp=spp,
             levels=ol,
-            model=model)
+            model=model,
+            data=data.frame(samp(mmi),lcc=x),
+            count=y)
   out
 }
 
@@ -231,15 +211,10 @@ mods_CONI <- modelallbuffers(spp="CONI", road="no",maxit=100)
 mods_CONI$buffer300$model
 
 
-
+# Predict density
 
 # Load prediction dataset: MCFN homelands
 pred_data <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/output/BAM_pred_data_wBuff0.csv", sep="")
-str(pred_data)
-
-modlist<-mods_CAWA
-preddata<-pred_data
-
 
 get_preds <- function(modlist,preddata){
   
@@ -247,7 +222,7 @@ get_preds <- function(modlist,preddata){
   rc_pred<-function(modlistbuffer,preddata){
     rc<-modlistbuffer$levels$levels[[length(modlistbuffer$levels$levels)]]
     x <- droplevels(preddata$HAB_NALC1)
-    levels(x) <- rc[levels(x)]
+     levels(x) <- rc[levels(x)]
     preddata$x<-x
     preddata$x<-relevel(preddata$x,rc[1])
     preddata
@@ -262,13 +237,7 @@ get_preds <- function(modlist,preddata){
   mod_matrix_pred<-lapply(rc_preddata,model.matrix,object=ff) # generate model matrix
   
   #####
-  getCoef<- function(modlistbuffer){
-    coef<-modlistbuffer$model$coef
-    coef
-  }
-  coefs <-lapply(modlist[-c(1,2)],getCoef)
-  
-  ests<-data.frame(buffer0=rep(NA,nrow(rc_preddata$buffer0)),
+  preds<-data.frame(buffer0=rep(NA,nrow(rc_preddata$buffer0)),
                    buffer50=rep(NA,nrow(rc_preddata$buffer50)),
                    buffer100=rep(NA,nrow(rc_preddata$buffer100)),
                    buffer150=rep(NA,nrow(rc_preddata$buffer150)),
@@ -279,83 +248,70 @@ get_preds <- function(modlist,preddata){
                    buffer400=rep(NA,nrow(rc_preddata$buffer400)),
                    buffer450=rep(NA,nrow(rc_preddata$buffer450)),
                    buffer500=rep(NA,nrow(rc_preddata$buffer500)))
-  for (i in 1:length(coefs)){
-    ests[,i]<- mod_matrix_pred[[i]]%*%coefs[[i]]
+  
+  
+  getCoef<- function(modlistbuffer){
+    coef<-modlistbuffer$model$coef
+    coef
   }
- 
+  
+
+  z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")
+  
+  coefs <-lapply(modlist[z+2],getCoef)
+  
+  
+  for (i in 1:length(coefs)){
+    if(ncol(mod_matrix_pred[[names(coefs[i])]])==length(coefs[[i]])){
+      preds[,names(coefs)[i]]<- exp(mod_matrix_pred[[names(coefs[i])]]%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+    }
+    else{
+    x<-mod_matrix_pred[[names(coefs[i])]]
+    x<-x[,-which(colnames(mod_matrix_pred[[names(coefs[i])]])%in%attr(coefs[[i]], "names")==F)]
+        preds[,names(coefs)[i]]<- exp(x%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+    }
+  }
+  
+ preds
 }
 
+preds_cawa<-get_preds(mods_CAWA,pred_data)
 
 
-model.matrix(ff,rc_preddata$buffer0)
+get_preds(mods_RUBL,pred_data)
 
-modlist<-mods_CAWA
-preddata<-rc_pred_CAWA_250
-
-mods_CAWA$buffer0$levels$levels
-str(rc_preddata)
-
-levels(rc_preddata$x)
-
-
-rc_pred_RUBL_250<-rc_pred(mods_RUBL$buffer250,pred_data)
-# Predict density
-ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # model formula without road
-x<- model.matrix(ff,data.frame(y=1,rc_pred_CAWA_250))
-
-
-
-
-x%*%mods_RUBL$buffer250$model$coef # this is in ha. need to convert to km2
-
-
-cbind(attr(mod_matrix_pred, "dimnames")[[2]],attr(mods_CAWA$buffer250$model$coef,"names"))
-
-mods_OSFL <- modelallbuffers(spp="OSFL", road="no",maxit=100)
-mods_OSFL$buffer100$model
-
-mods_RUBL <- modelallbuffers(spp="RUBL", road="no",maxit=100)
-mods_RUBL$buffer100$model
-
-mods_CONI <- modelallbuffers(spp="CONI", road="no",maxit=100)
-mods_CONI$buffer300$model
 
 
 
 
 # Estimates and CIs for each buffer
-ests_CIs<- function(model){
-  mvsamps<- mvrnorm(n=1000,mu=model$coef,Sigma=model$vcov) # CIs estimated by drawing from a multivariate distribution with coefs and vcov, and quantiles
-  CIs<-t(apply(mvsamps,2,quantile,probs=c(0,0.9)))
-  ests<-cbind(coef=model$coef,CIs)
-  ests
+
+get_CIs<-function(modlist){
+  ests_CIs<- function(model){
+    mvsamps<- mvrnorm(n=1000,mu=model$coef,Sigma=model$vcov) # CIs estimated by drawing from a multivariate distribution with coefs and vcov, and quantiles
+    CIs<-t(apply(mvsamps,2,quantile,probs=c(0,0.9)))
+    ests<-cbind(coef=model$coef,CIs)
+    ests
+  }
+  z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")
+  
+  lapply(modlist[z+2],function(x){ests_CIs(x$model)})
 }
 
-ests_CIs(mods_CAWA$buffer0$model)
-ests_CIs(mods_CAWA$buffer50$model)
-ests_CIs(mods_CAWA$buffer100$model)
-ests_CIs(mods_CAWA$buffer150$model)
-ests_CIs(mods_CAWA$buffer200$model)
-ests_CIs(mods_CAWA$buffer250$model)
-ests_CIs(mods_CAWA$buffer300$model)
-ests_CIs(mods_CAWA$buffer350$model)
-ests_CIs(mods_CAWA$buffer400$model)
-ests_CIs(mods_CAWA$buffer450$model)
-ests_CIs(mods_CAWA$buffer500$model)
+get_CIs(mods_CAWA)
+get_CIs(mods_RUBL)
 
 
 
 
-ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT
 
-
-predict(mods_CAWA$buffer0$model,newdata=pred_data)
-
-mods_CAWA$buffer0$levels$levels
+# GoF
 
 
 
-## ROC/AUC
+## ROC/AUC?
+
+
 rocAll1 <- pblapply(1:ncol(mn), function(i) {
   pp <- mn[ss1,i] * exp(off1[ss1])
   roc(Y1[ss1], pp)
@@ -366,3 +322,4 @@ barplot(auc, ylim=c(0,1), space=0, ylab="AUC", xlab="Stages")
 lines(0:length(mods)+0.5, auc, col=2, lwd=2)
 
 
+mods_CAWA$buffer0$model$coef
