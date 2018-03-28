@@ -54,14 +54,14 @@ mm <- Mefa(YY3, DAT, TAX2, "inner")
 mm <- mm[!is.na(samp(mm)$HAB_NALC1),]
 
 
-
 # Model function
 
 model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
   if(is.null(buffer)==T){
     mmi<-mm }  
   else{
-    mmi<- mm[samp(mm)$SS%in% buffer$SS ,]}
+    mmi<- mm[samp(mm)$SS%in% buffer$SS ,]
+    }
   road_table <- table(mmi@samp$ROAD)
   
   set.seed(1)
@@ -127,39 +127,70 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
   
   if(road=="yes"){
     ff <- y ~ x + ROAD + CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # with road
-    y <- as.numeric(xtab(mmi)[,spp])
-    x <- droplevels(samp(mmi)$HAB_NALC1)
-    levels(x) <- rc[levels(x)]
-    
-    if(spp%in%colnames(OFF)==T){
-      model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)), keep_call=FALSE, vcov=TRUE)
-      #if running model with ROAD covariate returns NA road coef, check variable format (should be factor), then road_table object to see on and off road proportions
-    }
-    else{
-      model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", maxit=maxit)), keep_call=FALSE, vcov=TRUE)
-      #if running model with ROAD covariate returns NA road coef, check variable format (should be factor), then road_table object to see on and off road proportions
-    } 
-  }
- 
-  if(road=="no"){
-    ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # without road
-    y <- as.numeric(xtab(mmi)[,spp])
-    x <- droplevels(samp(mmi)$HAB_NALC1)
-    levels(x) <- rc[levels(x)]
-    if(spp%in%colnames(OFF)==T){
-      model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)), keep_call=FALSE, vcov=TRUE)
-    }
-    else{
-      model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", maxit=maxit)), keep_call=FALSE, vcov=TRUE)
-    }
-
   }
   
-  out<-list(spp=spp,
-            levels=ol,
-            model=model,
-            data=data.frame(samp(mmi),lcc=x),
-            count=y)
+  if(road=="no"){
+    ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # without road
+  }
+    
+  y <- as.numeric(xtab(mmi)[,spp])
+  x <- droplevels(samp(mmi)$HAB_NALC1)
+  levels(x) <- rc[levels(x)]
+  if(spp%in%colnames(OFF)==T){
+    model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", offset=OFF[rownames(mmi),spp],maxit=maxit)), keep_call=FALSE, vcov=TRUE)
+    
+    if(class(model)=="glm_skeleton"){
+      fitted<-exp(model.matrix(ff,samp(mmi))%*%model$coef + OFF[rownames(mmi),spp])
+    
+      mvsamps<- exp(model.matrix(ff,samp(mmi)) %*% t(mvrnorm(n=1000,mu=model$coef,Sigma=model$vcov)) + OFF[rownames(mmi),spp]) 
+ 
+      SEs<-apply(mvsamps,1,sd)
+      fits<-data.frame(count=y,fitted=fitted,SEs=SEs)
+      
+      #fitted values for BUFF0
+      fits0<-fits[dimnames(fitted)[[1]]%in%dimnames(samp(mm[samp(mm)$SS%in%BUFF0$SS,]))[[1]],]
+      
+      
+      out<-list(spp=spp,
+                levels=ol,
+                model=model,
+                fitted=fits,
+                fittedBUFF0=fits0)
+    }
+    else{
+      out<-list(spp=spp,
+                levels=ol,
+                model=model
+                )
+    }
+  }
+  else{
+    model<- glm_skeleton(try(glm(ff, data=samp(mmi),family="poisson", maxit=maxit)), keep_call=FALSE, vcov=TRUE)
+    
+    if(class(model)=="glm_skeleton"){
+      fitted<-exp(model.matrix(ff,samp(mmi))%*%model$coef)
+      
+      mvsamps<- exp(model.matrix(ff,samp(mmi)) %*% t(mvrnorm(n=1000,mu=model$coef,Sigma=model$vcov))) 
+      SEs<-apply(mvsamps,1,sd)
+      
+      fits<-data.frame(count=y,fitted=fitted,SEs=SEs)
+      
+      #fitted values for BUFF0
+      fits0<-fits[dimnames(fitted)[[1]]%in%dimnames(samp(mm[samp(mm)$SS%in%BUFF0$SS,]))[[1]],]
+      
+      
+      out<-list(spp=spp,
+                levels=ol,
+                model=model,
+                fitted=fits,
+                fittedBUFF0=fits0)
+    }
+    else{
+      out<-list(spp=spp,
+                levels=ol,
+                model=model)
+    }
+  }
   out
 }
 
@@ -199,16 +230,16 @@ modelallbuffers <- function(spp,road="no",maxit=25){
 
 
 mods_CAWA <- modelallbuffers(spp="CAWA", road="no",maxit=100)
-mods_CAWA$buffer100$model
+
 
 mods_OSFL <- modelallbuffers(spp="OSFL", road="no",maxit=100)
-mods_OSFL$buffer100$model
+
 
 mods_RUBL <- modelallbuffers(spp="RUBL", road="no",maxit=100)
-mods_RUBL$buffer100$model
+
 
 mods_CONI <- modelallbuffers(spp="CONI", road="no",maxit=100)
-mods_CONI$buffer300$model
+
 
 
 # Predict density
@@ -278,7 +309,7 @@ get_preds <- function(modlist,preddata){
 preds_cawa<-get_preds(mods_CAWA,pred_data)
 
 
-get_preds(mods_RUBL,pred_data)
+get_preds(mods_CAWA,pred_data)
 
 
 
@@ -304,22 +335,86 @@ get_CIs(mods_RUBL)
 
 
 
+## ROC/AUC
 
-# GoF
+get_ROC_AUC<-function(modlist){
+  simple_roc <- function(labels, scores){
+    labels <- labels[order(scores, decreasing=TRUE)]
+    data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+  }
+  simple_auc <- function(ROC) {
+    ROC$inv_spec <- 1-ROC$FPR
+    dx <- diff(ROC$inv_spec)
+    sum(dx * ROC$TPR[-1]) / sum(dx)
+  }
+  get_vectors<-function(modbuffer){
+    v1 <- data.frame(labels=modbuffer$fitted$count,scores=modbuffer$fitted$fitted)
+    v1$labels[which(v1$labels>0)]<-1
+    v1
+    v0 <- data.frame(labels=modbuffer$fittedBUFF0$count,scores=modbuffer$fittedBUFF0$fitted)
+    v0$labels[which(v0$labels>0)]<-1
+    v0
+    out<-list(v1=v1,
+             v0=v0)
+    out
+  }
+ z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")  
+ vlist<-lapply(modlist[z+2],get_vectors)
+ roc_list<-lapply(vlist,function(x){simple_roc(x$v1$labels,x$v1$scores)})
+ auc<-lapply(roc_list,simple_auc)
+ roc_list0<-lapply(vlist,function(x){simple_roc(x$v0$labels,x$v0$scores)})
+ auc0<-lapply(roc_list0,simple_auc)
+ out<-list(
+   roc=roc_list,
+   auc=auc,
+   rocbuff0=roc_list0,
+   aucbuff0=auc0
+   )
+}
+
+roc_CAWA<-get_ROC_AUC(mods_CAWA)
+roc_OSFL<-get_ROC_AUC(mods_OSFL)
+roc_RUBL<-get_ROC_AUC(mods_RUBL)
+roc_CONI<-get_ROC_AUC(mods_CONI)
+
+plot_AUC<-function(roc_spp){
+  plot(y=unlist(roc_spp$auc),x=1:length(unlist(roc_spp$auc))-0.1,xaxt="n",ylab="AUC",xlab="buffer",ylim=c(0,1))
+  axis(1,at=1:length(unlist(roc_spp$auc)),labels=attr(unlist(roc_spp$auc),"names"))
+  points(y=unlist(roc_spp$aucbuff0),x=1:length(unlist(roc_spp$auc))+0.1,xaxt="n",ylab="AUC",pch=16)
+  legend(1,0.4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
+}
+
+plot_AUC(roc_CAWA)
+
+plot_AUC(roc_OSFL)
+plot_AUC(roc_RUBL)
+plot_AUC(roc_CONI)
 
 
-
-## ROC/AUC?
-
-
-rocAll1 <- pblapply(1:ncol(mn), function(i) {
-  pp <- mn[ss1,i] * exp(off1[ss1])
-  roc(Y1[ss1], pp)
-})
-names(rocAll1) <- c("NULL", names(mods))
-auc <- sapply(rocAll1, function(z) as.numeric(z$auc))
-barplot(auc, ylim=c(0,1), space=0, ylab="AUC", xlab="Stages")
-lines(0:length(mods)+0.5, auc, col=2, lwd=2)
-
-
-mods_CAWA$buffer0$model$coef
+plot_SE<-function(modlist, log=TRUE){
+  if(log==TRUE){
+    z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")  
+    SElist<-lapply(modlist[z+2],function(x){median(x$fitted$SEs,na.rm=T)})
+    SElist0<-lapply(modlist[z+2],function(x){median(x$fittedBUFF0$SEs,na.rm=T)})
+    
+    plot(y=log(unlist(SElist)),x=1:length(SElist)-0.1,xaxt="n",ylab="log (median SE of fitted values)",xlab="buffer")
+    axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
+    points(y=log(unlist(SElist0)),x=1:length(SElist0)+0.1,pch=16)
+    legend(1,-2,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16)) 
+  }
+  if(log==FALSE){
+    z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")  
+    SElist<-lapply(modlist[z+2],function(x){median(x$fitted$SEs,na.rm=T)})
+    SElist0<-lapply(modlist[z+2],function(x){median(x$fittedBUFF0$SEs,na.rm=T)})
+    
+    plot(y=unlist(SElist),x=1:length(SElist)-0.1,xaxt="n",ylab="median SE of fitted values",xlab="buffer")
+    axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
+    points(y=unlist(SElist0),x=1:length(SElist0)+0.1,pch=16)
+    legend(1,0.3,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
+  }
+}
+plot_SE(mods_CAWA)
+plot_SE(mods_CAWA,F)
+plot_SE(mods_OSFL)
+plot_SE(mods_RUBL)
+plot_SE(mods_CONI)
