@@ -3,6 +3,7 @@ library(opticut)
 library(MASS)
 library(pbapply)
 library(pROC)
+library(sp)
 
 # raw data for coni
 load("G:/My Drive/BAM.SharedDrive/DataStuff/AvianData/Processed/BAM-BBS-tables_20170630.Rdata")
@@ -247,20 +248,24 @@ mods_CONI <- modelallbuffers(spp="CONI", road="no",maxit=100)
 # Load prediction dataset: MCFN homelands
 pred_data <- read.csv("C:/Users/voeroesd/Dropbox/BAM/MCFN/output/BAM_pred_data_wBuff0.csv", sep="")
 
+str(pred_data)
+
+
+
 get_preds <- function(modlist,preddata){
   
   # Reclass land cover variable in prediction dataset according to reclassing done for model
   rc_pred<-function(modlistbuffer,preddata){
     rc<-modlistbuffer$levels$levels[[length(modlistbuffer$levels$levels)]]
     x <- droplevels(preddata$HAB_NALC1)
-     levels(x) <- rc[levels(x)]
+    levels(x) <- rc[levels(x)]
     preddata$x<-x
     preddata$x<-relevel(preddata$x,rc[1])
     preddata
-    }
+  }
   
   rc_preddata<- lapply(modlist[-c(1,2)],rc_pred,preddata)
-    
+  
   rc_preddata<- lapply(rc_preddata,data.frame,y=1) # add intercept (y=1) column
   
   ff <- y ~ x +  CMI + CMIJJA + DD0 + DD5 + EMT + MSP + TD + DD02 + DD52 + CMI2 + CMIJJA2 + CMIJJA:DD0 + CMIJJA:DD5 + EMT:MSP + CMI:DD0 + CMI:DD5 + MSP:TD + MSP:EMT # model formula without road
@@ -268,52 +273,108 @@ get_preds <- function(modlist,preddata){
   mod_matrix_pred<-lapply(rc_preddata,model.matrix,object=ff) # generate model matrix
   
   #####
-  preds<-data.frame(buffer0=rep(NA,nrow(rc_preddata$buffer0)),
-                   buffer50=rep(NA,nrow(rc_preddata$buffer50)),
-                   buffer100=rep(NA,nrow(rc_preddata$buffer100)),
-                   buffer150=rep(NA,nrow(rc_preddata$buffer150)),
-                   buffer200=rep(NA,nrow(rc_preddata$buffer200)),
-                   buffer250=rep(NA,nrow(rc_preddata$buffer250)),
-                   buffer300=rep(NA,nrow(rc_preddata$buffer300)),
-                   buffer350=rep(NA,nrow(rc_preddata$buffer350)),
-                   buffer400=rep(NA,nrow(rc_preddata$buffer400)),
-                   buffer450=rep(NA,nrow(rc_preddata$buffer450)),
-                   buffer500=rep(NA,nrow(rc_preddata$buffer500)))
-  
-  
   getCoef<- function(modlistbuffer){
     coef<-modlistbuffer$model$coef
     coef
   }
   
-
+  getvcov<-function(modlistbuffer){
+    vcov<-modlistbuffer$model$vcov
+    vcov
+  }
+  
   z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")
   
   coefs <-lapply(modlist[z+2],getCoef)
+  vcovs <-lapply(modlist[z+2],getvcov)
   
   
+ 
+  
+  SEs<-CVs<-preds<-as.data.frame(matrix(NA,nrow=nrow(rc_preddata$buffer0),ncol = length(coefs),dimnames = list(NULL,names(coefs))))
+  
+
   for (i in 1:length(coefs)){
     if(ncol(mod_matrix_pred[[names(coefs[i])]])==length(coefs[[i]])){
       preds[,names(coefs)[i]]<- exp(mod_matrix_pred[[names(coefs[i])]]%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+      
+      mvsamps<- exp(mod_matrix_pred[[names(coefs[i])]] %*% t(mvrnorm(n=1000,mu=coefs[[i]],Sigma=vcovs[[i]])))*100
+      
+      is.na(mvsamps)<-is.infinite(mvsamps)
+      
+      CVs[,names(CVs)[i]]<-apply(mvsamps,1,sd,na.rm=T)/apply(mvsamps,1,mean,na.rm=T)
+      SEs[,names(SEs)[i]]<-apply(mvsamps,1,sd,na.rm=T)
     }
     else{
-    x<-mod_matrix_pred[[names(coefs[i])]]
-    x<-x[,-which(colnames(mod_matrix_pred[[names(coefs[i])]])%in%attr(coefs[[i]], "names")==F)]
-        preds[,names(coefs)[i]]<- exp(x%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+      x<-mod_matrix_pred[[names(coefs[i])]]
+      x<-x[,-which(colnames(mod_matrix_pred[[names(coefs[i])]])%in%attr(coefs[[i]], "names")==F)]
+      preds[,names(coefs)[i]]<- exp(x%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+      
+      mvsamps<- exp(x %*% t(mvrnorm(n=1000,mu=coefs[[i]],Sigma=vcovs[[i]])))*100
+      
+      is.na(mvsamps)<-is.infinite(mvsamps)
+      
+      CVs[,names(CVs)[i]]<-apply(mvsamps,1,sd,na.rm=T)/apply(mvsamps,1,mean,na.rm=T)
+      SEs[,names(SEs)[i]]<-apply(mvsamps,1,sd,na.rm=T)
     }
   }
   
- preds
+  out<-list(preds=preds,
+            SEs=SEs,
+            CVs=CVs)
+  out
 }
 
-preds_cawa<-get_preds(mods_CAWA,pred_data)
-
-
-get_preds(mods_CAWA,pred_data)
 
 
 
+library(viridis)
 
+preds_CAWA<-get_preds(mods_CAWA,pred_data)
+points_pred_CAWA<-data.frame(pred_data,density=preds_CAWA$preds$buffer500,SEs=preds_CAWA$SEs$buffer500,CVs=preds_CAWA$CVs$buffer500)
+density_pixels_CAWA<-SpatialPixelsDataFrame(points=points_pred_CAWA[,c(2,3)],data=points_pred_CAWA, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
+plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)))
+plot(density_pixels_CAWA["SEs"], col=rev(magma(250)))
+plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)))
+
+
+writeRaster(raster(density_pixels_CAWA["density"]),filename = "predsCAWA500km",prj=TRUE,  format = "GTiff",overwrite=T)
+#summary(density_pixels_CAWA$density)
+#plot(density_pixels_CAWA$density)
+
+preds_OSFL<-get_preds(mods_OSFL,pred_data)
+points_pred_OSFL<-data.frame(pred_data,density=preds_OSFL$preds$buffer200, SEs=preds_OSFL$SEs$buffer200, CVs=preds_OSFL$CVs$buffer200)
+density_pixels_OSFL<-SpatialPixelsDataFrame(points=points_pred_OSFL[,c(2,3)],data=points_pred_OSFL, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
+plot(density_pixels_OSFL["density"], col=rev(viridis(250, end=0.96)))
+plot(density_pixels_OSFL["SEs"], col=rev(magma(250)))
+plot(density_pixels_OSFL["CVs"], col=rev(inferno(250)))
+
+writeRaster(raster(density_pixels_OSFL["density"]),filename = "predsOSFL200km",prj=TRUE,  format = "GTiff",overwrite=T)
+#summary(density_pixels_OSFL$density)
+#plot(density_pixels_OSFL$density)
+
+preds_RUBL<-get_preds(mods_RUBL,pred_data)
+points_pred_RUBL<-data.frame(pred_data,density=preds_RUBL$preds$buffer300, SEs=preds_RUBL$SEs$buffer300, CVs=preds_RUBL$CVs$buffer300)
+density_pixels_RUBL<-SpatialPixelsDataFrame(points=points_pred_RUBL[,c(2,3)],data=points_pred_RUBL, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
+plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)))
+plot(density_pixels_RUBL["SEs"], col=rev(magma(250)))
+plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)))
+
+writeRaster(raster(density_pixels_RUBL["density"]),filename = "predsRUBL300km",prj=TRUE,  format = "GTiff",overwrite=T)
+#summary(density_pixels_RUBL$density)
+#plot(density_pixels_RUBL$density)
+
+preds_CONI<-get_preds(mods_CONI,pred_data)
+points_pred_CONI<-data.frame(pred_data,density=preds_CONI$preds$buffer500, SEs=preds_CONI$SEs$buffer500, CVs=preds_CONI$CVs$buffer500)
+density_pixels_CONI<-SpatialPixelsDataFrame(points=points_pred_CONI[,c(2,3)],data=points_pred_CONI, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
+plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)),zlim=c(0,2))
+plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)))
+plot(density_pixels_CONI["SEs"], col=rev(magma(250)))
+plot(density_pixels_CONI["CVs"], col=rev(inferno(250)))
+
+writeRaster(raster(density_pixels_CONI["density"]),filename = "predsCONI500km",prj=TRUE,  format = "GTiff",overwrite=T)
+#summary(density_pixels_CONI$density)
+#plot(density_pixels_CONI$density)
 
 # Estimates and CIs for each buffer
 
@@ -330,7 +391,7 @@ get_CIs<-function(modlist){
 }
 
 get_CIs(mods_CAWA)
-get_CIs(mods_RUBL)
+get_CIs(mods_CONI)
 
 
 
@@ -378,11 +439,13 @@ roc_RUBL<-get_ROC_AUC(mods_RUBL)
 roc_CONI<-get_ROC_AUC(mods_CONI)
 
 plot_AUC<-function(roc_spp){
-  plot(y=unlist(roc_spp$auc),x=1:length(unlist(roc_spp$auc))-0.1,xaxt="n",ylab="AUC",xlab="buffer",ylim=c(0,1))
+  plot(y=unlist(roc_spp$auc),x=1:length(unlist(roc_spp$auc))-0.1,xaxt="n",ylab="AUC",xlab="buffer",ylim=c(0.5,1))
   axis(1,at=1:length(unlist(roc_spp$auc)),labels=attr(unlist(roc_spp$auc),"names"))
   points(y=unlist(roc_spp$aucbuff0),x=1:length(unlist(roc_spp$auc))+0.1,xaxt="n",ylab="AUC",pch=16)
-  legend(1,0.4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
+  legend(1,0.6,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
 }
+
+
 
 plot_AUC(roc_CAWA)
 
@@ -394,27 +457,54 @@ plot_AUC(roc_CONI)
 plot_SE<-function(modlist, log=TRUE){
   if(log==TRUE){
     z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")  
-    SElist<-lapply(modlist[z+2],function(x){median(x$fitted$SEs,na.rm=T)})
-    SElist0<-lapply(modlist[z+2],function(x){median(x$fittedBUFF0$SEs,na.rm=T)})
+    SElist2<-SElist<-lapply(modlist[z+2],function(x){mean(x$fitted$SEs,na.rm=T)})
+    SElist0<-lapply(modlist[z+2],function(x){mean(x$fittedBUFF0$SEs,na.rm=T)})
     
-    plot(y=log(unlist(SElist)),x=1:length(SElist)-0.1,xaxt="n",ylab="log (median SE of fitted values)",xlab="buffer")
+    SE_median<-lapply(modlist[z+2],function(x){median(x$fitted$SEs,na.rm=T)})
+    SElist0_median<-lapply(modlist[z+2],function(x){median(x$fittedBUFF0$SEs,na.rm=T)})
+    
+    is.na(SElist2)<-is.infinite(unlist(SElist))
+    
+    
+    par(mfrow=c(2,1))
+    plot(y=log(unlist(SElist)),x=1:length(SElist)-0.1,xaxt="n",ylab="log (mean SE of fitted values)",xlab="",ylim=c(min(log(c(unlist(SElist2),unlist(SElist0))),na.rm=T),max(log(c(unlist(SElist2),unlist(SElist0))),na.rm=T)))
     axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
     points(y=log(unlist(SElist0)),x=1:length(SElist0)+0.1,pch=16)
-    legend(1,-2,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16)) 
+    legend(2,60,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    
+    plot(y=log(unlist(SE_median)),x=1:length(SE_median)-0.1,xaxt="n",ylab="log (median SE of fitted values)",xlab="",ylim=c(min(log(c(unlist(SE_median),unlist(SElist0_median))),na.rm=T),max(log(c(unlist(SE_median),unlist(SElist0_median))),na.rm=T)))
+    axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
+    points(y=log(unlist(SElist0_median)),x=1:length(SElist0)+0.1,pch=16)
+    legend(1,-4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    par(mfrow=c(1,1))
   }
   if(log==FALSE){
     z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")  
-    SElist<-lapply(modlist[z+2],function(x){median(x$fitted$SEs,na.rm=T)})
-    SElist0<-lapply(modlist[z+2],function(x){median(x$fittedBUFF0$SEs,na.rm=T)})
+    SElist<-lapply(modlist[z+2],function(x){mean(x$fitted$SEs,na.rm=T)})
+    SElist0<-lapply(modlist[z+2],function(x){mean(x$fittedBUFF0$SEs,na.rm=T)})
     
-    plot(y=unlist(SElist),x=1:length(SElist)-0.1,xaxt="n",ylab="median SE of fitted values",xlab="buffer")
+    SE_median<-lapply(modlist[z+2],function(x){median(x$fitted$SEs,na.rm=T)})
+    SElist0_median<-lapply(modlist[z+2],function(x){median(x$fittedBUFF0$SEs,na.rm=T)})
+    
+    is.na(SElist2)<-is.infinite(unlist(SElist))
+    
+    par(mfrow=c(2,1))
+    plot(y=unlist(SElist),x=1:length(SElist)-0.1,xaxt="n",ylab="mean SE of fitted values",xlab="",ylim=c(min(c(unlist(SElist2),unlist(SElist0)),na.rm=T),max(c(unlist(SElist2),unlist(SElist0)),na.rm=T)))
     axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
     points(y=unlist(SElist0),x=1:length(SElist0)+0.1,pch=16)
-    legend(1,0.3,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
+    legend(2,60,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    
+    plot(y=unlist(SE_median),x=1:length(SE_median)-0.1,xaxt="n",ylab="median SE of fitted values",xlab="",ylim=c(min(c(unlist(SE_median),unlist(SElist0_median)),na.rm=T),max(c(unlist(SE_median),unlist(SElist0_median)),na.rm=T)))
+    axis(1,at=1:length(SE_median),labels=attr(unlist(SE_median),"names"))
+    points(y=unlist(SElist0_median),x=1:length(SElist0)+0.1,pch=16)
+    legend(1,-4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    par(mfrow=c(1,1))
   }
 }
+
 plot_SE(mods_CAWA)
 plot_SE(mods_CAWA,F)
 plot_SE(mods_OSFL)
 plot_SE(mods_RUBL)
 plot_SE(mods_CONI)
+
