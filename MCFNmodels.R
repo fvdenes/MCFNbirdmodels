@@ -172,6 +172,7 @@ model_1 <- function(spp, buffer = NULL, road="no", maxit=25) {
       fitted<-exp(model.matrix(ff,samp(mmi))%*%model$coef)
       
       mvsamps<- exp(model.matrix(ff,samp(mmi)) %*% t(mvrnorm(n=1000,mu=model$coef,Sigma=model$vcov))) 
+
       SEs<-apply(mvsamps,1,sd)
       
       fits<-data.frame(count=y,fitted=fitted,SEs=SEs)
@@ -296,9 +297,9 @@ get_preds <- function(modlist,preddata){
 
   for (i in 1:length(coefs)){
     if(ncol(mod_matrix_pred[[names(coefs[i])]])==length(coefs[[i]])){
-      preds[,names(coefs)[i]]<- exp(mod_matrix_pred[[names(coefs[i])]]%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+      preds[,names(coefs)[i]]<- exp(mod_matrix_pred[[names(coefs[i])]]%*%coefs[[i]])
       
-      mvsamps<- exp(mod_matrix_pred[[names(coefs[i])]] %*% t(mvrnorm(n=1000,mu=coefs[[i]],Sigma=vcovs[[i]])))*100
+      mvsamps<- exp(mod_matrix_pred[[names(coefs[i])]] %*% t(mvrnorm(n=1000,mu=coefs[[i]],Sigma=vcovs[[i]])))
       
       is.na(mvsamps)<-is.infinite(mvsamps)
       
@@ -308,9 +309,9 @@ get_preds <- function(modlist,preddata){
     else{
       x<-mod_matrix_pred[[names(coefs[i])]]
       x<-x[,-which(colnames(mod_matrix_pred[[names(coefs[i])]])%in%attr(coefs[[i]], "names")==F)]
-      preds[,names(coefs)[i]]<- exp(x%*%coefs[[i]])*100 # km^2 vs ha diff is 100
+      preds[,names(coefs)[i]]<- exp(x%*%coefs[[i]])
       
-      mvsamps<- exp(x %*% t(mvrnorm(n=1000,mu=coefs[[i]],Sigma=vcovs[[i]])))*100
+      mvsamps<- exp(x %*% t(mvrnorm(n=1000,mu=coefs[[i]],Sigma=vcovs[[i]])))
       
       is.na(mvsamps)<-is.infinite(mvsamps)
       
@@ -331,14 +332,26 @@ get_preds <- function(modlist,preddata){
 library(viridis)
 
 preds_CAWA<-get_preds(mods_CAWA,pred_data)
-points_pred_CAWA<-data.frame(pred_data,density=preds_CAWA$preds$buffer500,SEs=preds_CAWA$SEs$buffer500,CVs=preds_CAWA$CVs$buffer500)
+points_pred_CAWA<-data.frame(pred_data,density=preds_CAWA$preds$buffer450,SEs=preds_CAWA$SEs$buffer500,CVs=preds_CAWA$CVs$buffer500)
 density_pixels_CAWA<-SpatialPixelsDataFrame(points=points_pred_CAWA[,c(2,3)],data=points_pred_CAWA, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
-plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)))
-plot(density_pixels_CAWA["SEs"], col=rev(magma(250)))
-plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)))
+plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)), scale.shrink=2, zlim=c(0,12),axes=T)
+map.axes()
+#plot(density_pixels_CAWA["SEs"], col=rev(magma(250)))
+plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)), scale.shrink=2, zlim=c(0,0.5))
+box()
+
+layout(matrix(1:4, 2, 2), heights = c(8,1))
+plot(density_pixels_CAWA["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.12))
+text(x=1050000,y=1100000,"Density of singing males (per ha)")
+plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.12), what = "scale", axis.pos = 1)
+plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)), what="image")
+text(x=1050000,y=1100000," Coefficient of variation")
+plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+
 
 
 writeRaster(raster(density_pixels_CAWA["density"]),filename = "predsCAWA500km",prj=TRUE,  format = "GTiff",overwrite=T)
+writeRaster(raster(density_pixels_CAWA["CVs"]),filename = "predsCAWA500km_CVs",prj=TRUE,  format = "GTiff",overwrite=T)
 #summary(density_pixels_CAWA$density)
 #plot(density_pixels_CAWA$density)
 
@@ -346,10 +359,22 @@ preds_OSFL<-get_preds(mods_OSFL,pred_data)
 points_pred_OSFL<-data.frame(pred_data,density=preds_OSFL$preds$buffer200, SEs=preds_OSFL$SEs$buffer200, CVs=preds_OSFL$CVs$buffer200)
 density_pixels_OSFL<-SpatialPixelsDataFrame(points=points_pred_OSFL[,c(2,3)],data=points_pred_OSFL, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
 plot(density_pixels_OSFL["density"], col=rev(viridis(250, end=0.96)))
-plot(density_pixels_OSFL["SEs"], col=rev(magma(250)))
+plot(density_pixels_OSFL["density"], col=rev(viridis(250, end=0.96)),zlim=c(0,10))
+#plot(density_pixels_OSFL["SEs"], col=rev(magma(250)))
 plot(density_pixels_OSFL["CVs"], col=rev(inferno(250)))
 
+layout(matrix(1:4, 2, 2), heights = c(8,1))
+plot(density_pixels_OSFL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.07))
+text(x=1050000,y=1100000,"Density of singing males (per ha)")
+plot(density_pixels_OSFL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.07), what = "scale", axis.pos = 1)
+plot(density_pixels_OSFL["CVs"], col=rev(inferno(250)),  what="image")
+text(x=1050000,y=1100000," Coefficient of variation")
+plot(density_pixels_OSFL["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+
+
+
 writeRaster(raster(density_pixels_OSFL["density"]),filename = "predsOSFL200km",prj=TRUE,  format = "GTiff",overwrite=T)
+writeRaster(raster(density_pixels_OSFL["CVs"]),filename = "predsOSFL200km_CVs",prj=TRUE,  format = "GTiff",overwrite=T)
 #summary(density_pixels_OSFL$density)
 #plot(density_pixels_OSFL$density)
 
@@ -357,27 +382,178 @@ preds_RUBL<-get_preds(mods_RUBL,pred_data)
 points_pred_RUBL<-data.frame(pred_data,density=preds_RUBL$preds$buffer300, SEs=preds_RUBL$SEs$buffer300, CVs=preds_RUBL$CVs$buffer300)
 density_pixels_RUBL<-SpatialPixelsDataFrame(points=points_pred_RUBL[,c(2,3)],data=points_pred_RUBL, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
 plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)))
-plot(density_pixels_RUBL["SEs"], col=rev(magma(250)))
+plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)),zlim=c(0,10))
+#plot(density_pixels_RUBL["SEs"], col=rev(magma(250)))
 plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)))
 
+layout(matrix(1:4, 2, 2), heights = c(8,1))
+plot(density_pixels_RUBL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,2))
+text(x=1050000,y=1100000,"Density of singing males (per ha)")
+plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,2), what = "scale", axis.pos = 1)
+plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)),  what="image")
+text(x=1050000,y=1100000," Coefficient of variation")
+plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+
 writeRaster(raster(density_pixels_RUBL["density"]),filename = "predsRUBL300km",prj=TRUE,  format = "GTiff",overwrite=T)
+writeRaster(raster(density_pixels_RUBL["CVs"]),filename = "predsRUBL300km_CVs",prj=TRUE,  format = "GTiff",overwrite=T)
 #summary(density_pixels_RUBL$density)
 #plot(density_pixels_RUBL$density)
 
 preds_CONI<-get_preds(mods_CONI,pred_data)
 points_pred_CONI<-data.frame(pred_data,density=preds_CONI$preds$buffer500, SEs=preds_CONI$SEs$buffer500, CVs=preds_CONI$CVs$buffer500)
 density_pixels_CONI<-SpatialPixelsDataFrame(points=points_pred_CONI[,c(2,3)],data=points_pred_CONI, proj4string = CRS("+proj=lcc +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "), tolerance=0.9 )
-plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)),zlim=c(0,2))
 plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)))
-plot(density_pixels_CONI["SEs"], col=rev(magma(250)))
+plot(density_pixels_CONI["density"], col=rev(magma(250, end=0.96)),zlim=c(0,10))
+#plot(density_pixels_CONI["SEs"], col=rev(magma(250)))
 plot(density_pixels_CONI["CVs"], col=rev(inferno(250)))
 
+
+layout(matrix(1:4, 2, 2), heights = c(8,1))
+plot(density_pixels_CONI["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.8))
+text(x=1050000,y=1100000,"Relative density (individuals per ha)")
+plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.8), what = "scale", axis.pos = 1)
+plot(density_pixels_CONI["CVs"], col=rev(inferno(250)),  what="image")
+text(x=1050000,y=1100000," Coefficient of variation")
+plot(density_pixels_CONI["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+
 writeRaster(raster(density_pixels_CONI["density"]),filename = "predsCONI500km",prj=TRUE,  format = "GTiff",overwrite=T)
+writeRaster(raster(density_pixels_CONI["CVs"]),filename = "predsCONI500km_CVs",prj=TRUE,  format = "GTiff",overwrite=T)
 #summary(density_pixels_CONI$density)
 #plot(density_pixels_CONI$density)
 
-# Estimates and CIs for each buffer
+# what is the land cover of grid cells with highest CVs:
+lc_highCV_CAWA<-points_pred_CAWA$HAB_NALC1[which(points_pred_CAWA$CVs>quantile(points_pred_CAWA$CVs, probs=0.90))]
+sort(round(table(lc_highCV_CAWA)/length(lc_highCV_CAWA),2),decreasing = T)
 
+lc_highCV_OSFL<-points_pred_OSFL$HAB_NALC1[which(points_pred_OSFL$CVs>quantile(points_pred_OSFL$CVs, probs=0.90))]
+sort(round(table(lc_highCV_OSFL)/length(lc_highCV_OSFL),2),decreasing = T)
+
+lc_highCV_RUBL<-points_pred_RUBL$HAB_NALC1[which(points_pred_RUBL$CVs>quantile(points_pred_RUBL$CVs, probs=0.90))]
+sort(round(table(lc_highCV_RUBL)/length(lc_highCV_RUBL),2),decreasing = T)
+
+lc_highCV_CONI<-points_pred_CONI$HAB_NALC1[which(points_pred_CONI$CVs>quantile(points_pred_CONI$CVs, probs=0.90))]
+sort(round(table(lc_highCV_CONI)/length(lc_highCV_CONI),2),decreasing = T)
+
+
+# Predictions by land cover type (for plotting):
+library(ggplot2)
+
+## Function to summarize dat for ggplots.
+## Gives count, mean, standard deviation, standard error of the mean, and confidence 
+## interval (default 95%).
+##   data: a data frame.
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   groupvars: a vector containing names of columns that contain grouping variables
+##   na.rm: a boolean that indicates whether to ignore NA's
+##   conf.interval: the percent range of the confidence interval (default is 95%)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE, conf.interval=.95) {
+  library(doBy)
+  
+  # New version of length which can handle NA's: if na.rm==T, don't count them
+  length2 <- function (x, na.rm=FALSE) {
+    if (na.rm) sum(!is.na(x))
+    else       length(x)
+  }
+  
+  # Collapse the data
+  formula <- as.formula(paste(measurevar, paste(groupvars, collapse=" + "), sep=" ~ "))
+  datac <- summaryBy(formula, data=data, FUN=c(length2,mean,sd), na.rm=na.rm)
+  
+  # Rename columns
+  names(datac)[ names(datac) == paste(measurevar, ".mean",    sep="") ] <- measurevar
+  names(datac)[ names(datac) == paste(measurevar, ".sd",      sep="") ] <- "sd"
+  names(datac)[ names(datac) == paste(measurevar, ".length2", sep="") ] <- "N"
+  
+  datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+  
+  # Confidence interval multiplier for standard error
+  # Calculate t-statistic for confidence interval: 
+  # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+  ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+  datac$ci <- datac$se * ciMult
+  
+  return(datac)
+}
+
+
+
+plot_lc_dens<-function(preddf,modlistbuffer,response.density=TRUE){
+  library(ggplot2)
+  summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE, conf.interval=.95) {
+    library(doBy)
+    
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+      if (na.rm) sum(!is.na(x))
+      else       length(x)
+    }
+    
+    # Collapse the data
+    formula <- as.formula(paste(measurevar, paste(groupvars, collapse=" + "), sep=" ~ "))
+    datac <- summaryBy(formula, data=data, FUN=c(length2,mean,sd), na.rm=na.rm)
+    
+    # Rename columns
+    names(datac)[ names(datac) == paste(measurevar, ".mean",    sep="") ] <- measurevar
+    names(datac)[ names(datac) == paste(measurevar, ".sd",      sep="") ] <- "sd"
+    names(datac)[ names(datac) == paste(measurevar, ".length2", sep="") ] <- "N"
+    
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+    
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+    
+    return(datac)
+  }
+  # reclass landcover according to model reclassing
+  rc_pred<-function(modlistbuffer,preddata){
+    rc<-modlistbuffer$levels$levels[[length(modlistbuffer$levels$levels)]]
+    x <- droplevels(preddata$HAB_NALC1)
+    levels(x) <- rc[levels(x)]
+    preddata$x<-x
+    preddata$x<-relevel(preddata$x,rc[1])
+    preddata
+  }
+  sumgg <- summarySE(preddf,measurevar="density",groupvars = "HAB_NALC1")
+  sumgg <-rc_pred(modlistbuffer,sumgg)
+  sumgg$HAB_NALC1<-factor(sumgg$HAB_NALC1, levels = sumgg$HAB_NALC1[order(sumgg$x)])
+  sumgg$z<-as.factor(as.numeric(sumgg$x))
+  
+  if(response.density==TRUE){
+    ggplot(sumgg,aes(x=HAB_NALC1,y=density, fill=z))+
+      geom_bar(position=position_dodge(), stat="identity") +
+      geom_errorbar(aes(ymin=density-sd, ymax=density+sd),
+                    width=.2,                    # Width of the error bars
+                    position=position_dodge(.9)) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1,size=15,face="bold", colour = magma(n = length(levels(sumgg$z)),begin = 0.2, end=0.8)[sort(sumgg$z)]),panel.background = element_rect(fill = "white", colour = "grey50"),axis.text.y=element_text(size=12,face="bold"),axis.title=element_text(size=12,face="bold"))+
+      xlab("Land cover class") + ylab("Density of singing males (per ha)")+
+      labs(fill = "Class grouping")+
+      scale_fill_viridis(discrete=TRUE, begin = 0.2, end=0.8, guide=F,option = "magma") 
+  }
+  else{
+    ggplot(sumgg,aes(x=HAB_NALC1,y=density, fill=z))+
+      geom_bar(position=position_dodge(), stat="identity") +
+      geom_errorbar(aes(ymin=density-sd, ymax=density+sd),
+                    width=.2,                    # Width of the error bars
+                    position=position_dodge(.9)) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1,size=15,face="bold", colour = magma(n = length(levels(sumgg$z)),begin = 0.2, end=0.9)[sort(sumgg$z)]),panel.background = element_rect(fill = "white", colour = "grey50"),axis.text.y=element_text(size=12,face="bold"),axis.title=element_text(size=12,face="bold"))+
+      xlab("Land cover class") + ylab(" Relative density (per ha)")+
+      labs(fill = "Class grouping")+
+      scale_fill_viridis(discrete=TRUE, begin = 0.25, end=0.75, guide=F,option = "magma") 
+    
+  }
+}
+
+
+plot_lc_dens(points_pred_CAWA,mods_CAWA$buffer500)
+plot_lc_dens(points_pred_OSFL,mods_OSFL$buffer200)
+plot_lc_dens(points_pred_RUBL,mods_RUBL$buffer300)
+plot_lc_dens(points_pred_CONI,mods_CONI$buffer500, response.density = F)
+
+# Estimates and CIs for each buffer
+dev.off()
 get_CIs<-function(modlist){
   ests_CIs<- function(model){
     mvsamps<- mvrnorm(n=1000,mu=model$coef,Sigma=model$vcov) # CIs estimated by drawing from a multivariate distribution with coefs and vcov, and quantiles
@@ -390,10 +566,8 @@ get_CIs<-function(modlist){
   lapply(modlist[z+2],function(x){ests_CIs(x$model)})
 }
 
+
 get_CIs(mods_CAWA)
-get_CIs(mods_CONI)
-
-
 
 
 ## ROC/AUC
@@ -439,7 +613,7 @@ roc_RUBL<-get_ROC_AUC(mods_RUBL)
 roc_CONI<-get_ROC_AUC(mods_CONI)
 
 plot_AUC<-function(roc_spp){
-  plot(y=unlist(roc_spp$auc),x=1:length(unlist(roc_spp$auc))-0.1,xaxt="n",ylab="AUC",xlab="buffer",ylim=c(0.5,1))
+  plot(y=unlist(roc_spp$auc),x=1:length(unlist(roc_spp$auc))-0.1,xaxt="n",ylab="AUC",xlab="buffer (km)",ylim=c(0.5,1))
   axis(1,at=1:length(unlist(roc_spp$auc)),labels=attr(unlist(roc_spp$auc),"names"))
   points(y=unlist(roc_spp$aucbuff0),x=1:length(unlist(roc_spp$auc))+0.1,xaxt="n",ylab="AUC",pch=16)
   legend(1,0.6,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
@@ -455,8 +629,26 @@ plot_AUC(roc_CONI)
 
 
 plot_SE<-function(modlist, log=TRUE){
+  
+  plot_AUC<-function(roc_spp){
+    plot(y=unlist(roc_spp$auc),x=1:length(unlist(roc_spp$auc))-0.1,xaxt="n",ylab="AUC",xlab="",ylim=c(0.5,1))
+    #axis(1,at=1:length(unlist(roc_spp$auc)),labels=attr(unlist(roc_spp$auc),"names"))
+    points(y=unlist(roc_spp$aucbuff0),x=1:length(unlist(roc_spp$auc))+0.1,xaxt="n",ylab="AUC",pch=16)
+    legend(1,0.75,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16))
+  }
+  
+  inf.replace<-function(x){
+    x$fitted$SEs[which(is.infinite(x$fitted$SEs))]<-NA
+    x$fittedBUFF0$SEs[which(is.infinite(x$fittedBUFF0$SEs))]<-NA
+    x
+  }
+  
   if(log==TRUE){
     z<-which(lapply(modlist[-c(1,2)],function(x){class(x$model)})=="glm_skeleton")  
+    
+
+    modlist[z+2]<-lapply(modlist[z+2], inf.replace)
+    
     SElist2<-SElist<-lapply(modlist[z+2],function(x){mean(x$fitted$SEs,na.rm=T)})
     SElist0<-lapply(modlist[z+2],function(x){mean(x$fittedBUFF0$SEs,na.rm=T)})
     
@@ -466,16 +658,24 @@ plot_SE<-function(modlist, log=TRUE){
     is.na(SElist2)<-is.infinite(unlist(SElist))
     
     
-    par(mfrow=c(2,1))
+    par(mfrow=c(3,1),mar=c(1.1,4.1,2.1,2.1))
+    
+    roc<-get_ROC_AUC(modlist)
+    plot_AUC(roc)
+    
+    par(mar=c(2.1,4.1,1.1,2.1))
+    
     plot(y=log(unlist(SElist)),x=1:length(SElist)-0.1,xaxt="n",ylab="log (mean SE of fitted values)",xlab="",ylim=c(min(log(c(unlist(SElist2),unlist(SElist0))),na.rm=T),max(log(c(unlist(SElist2),unlist(SElist0))),na.rm=T)))
-    axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
+    #axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
     points(y=log(unlist(SElist0)),x=1:length(SElist0)+0.1,pch=16)
-    legend(2,60,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    #legend(2,60,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16)) 
+    
+    par(mar=c(3.1,4.1,0.1,2.1))
     
     plot(y=log(unlist(SE_median)),x=1:length(SE_median)-0.1,xaxt="n",ylab="log (median SE of fitted values)",xlab="",ylim=c(min(log(c(unlist(SE_median),unlist(SElist0_median))),na.rm=T),max(log(c(unlist(SE_median),unlist(SElist0_median))),na.rm=T)))
     axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
     points(y=log(unlist(SElist0_median)),x=1:length(SElist0)+0.1,pch=16)
-    legend(1,-4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    #legend(1,-4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16)) 
     par(mfrow=c(1,1))
   }
   if(log==FALSE){
@@ -488,22 +688,30 @@ plot_SE<-function(modlist, log=TRUE){
     
     is.na(SElist2)<-is.infinite(unlist(SElist))
     
-    par(mfrow=c(2,1))
+    par(mfrow=c(3,1),mar=c(1.1,4.1,2.1,2.1))
+    
+    roc<-get_ROC_AUC(modlist)
+    plot_AUC(roc)
+    
+    par(mar=c(2.1,4.1,2.1,2.1))
+    
     plot(y=unlist(SElist),x=1:length(SElist)-0.1,xaxt="n",ylab="mean SE of fitted values",xlab="",ylim=c(min(c(unlist(SElist2),unlist(SElist0)),na.rm=T),max(c(unlist(SElist2),unlist(SElist0)),na.rm=T)))
-    axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
+    #axis(1,at=1:length(SElist),labels=attr(unlist(SElist),"names"))
     points(y=unlist(SElist0),x=1:length(SElist0)+0.1,pch=16)
-    legend(2,60,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    #legend(2,60,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16)) 
+    
+    par(mar=c(3.1,4.1,2.1,2.1))
     
     plot(y=unlist(SE_median),x=1:length(SE_median)-0.1,xaxt="n",ylab="median SE of fitted values",xlab="",ylim=c(min(c(unlist(SE_median),unlist(SElist0_median)),na.rm=T),max(c(unlist(SE_median),unlist(SElist0_median)),na.rm=T)))
     axis(1,at=1:length(SE_median),labels=attr(unlist(SE_median),"names"))
     points(y=unlist(SElist0_median),x=1:length(SElist0)+0.1,pch=16)
-    legend(1,-4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16),cex=0.6) 
+    #legend(1,-4,legend=c("Buffer area", "MCFN homelands"), pch=c(1,16)) 
     par(mfrow=c(1,1))
   }
 }
 
 plot_SE(mods_CAWA)
-plot_SE(mods_CAWA,F)
+#plot_SE(mods_CAWA,F)
 plot_SE(mods_OSFL)
 plot_SE(mods_RUBL)
 plot_SE(mods_CONI)
