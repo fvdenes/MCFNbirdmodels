@@ -328,8 +328,12 @@ get_preds <- function(modlist,preddata){
 
 
 
-
+library(RColorBrewer)
 library(viridis)
+library(sp)
+library(rgeos)
+library(rgdal)
+library(raster)
 
 preds_CAWA<-get_preds(mods_CAWA,pred_data)
 points_pred_CAWA<-data.frame(pred_data,density=preds_CAWA$preds$buffer450,SEs=preds_CAWA$SEs$buffer500,CVs=preds_CAWA$CVs$buffer500)
@@ -338,15 +342,18 @@ plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)), scale.shri
 map.axes()
 #plot(density_pixels_CAWA["SEs"], col=rev(magma(250)))
 plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)), scale.shrink=2, zlim=c(0,0.5))
+
+plot(density_pixels_CAWA["CVs"], col= colorRampPalette(brewer.pal(9,"PRGn"))(250)[76:250] , scale.shrink=2, zlim=c(0,3.5))
+
 box()
 
 layout(matrix(1:4, 2, 2), heights = c(8,1))
 plot(density_pixels_CAWA["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.12))
 text(x=1050000,y=1100000,"Density of singing males (per ha)")
 plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.12), what = "scale", axis.pos = 1)
-plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)), what="image")
+plot(density_pixels_CAWA["CVs"], col= colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5), what="image")
 text(x=1050000,y=1100000," Coefficient of variation")
-plot(density_pixels_CAWA["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+plot(density_pixels_CAWA["CVs"], col= colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5),  what = "scale", axis.pos = 1)
 
 
 
@@ -367,9 +374,9 @@ layout(matrix(1:4, 2, 2), heights = c(8,1))
 plot(density_pixels_OSFL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.07))
 text(x=1050000,y=1100000,"Density of singing males (per ha)")
 plot(density_pixels_OSFL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.07), what = "scale", axis.pos = 1)
-plot(density_pixels_OSFL["CVs"], col=rev(inferno(250)),  what="image")
+plot(density_pixels_OSFL["CVs"], col= colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5),  what="image")
 text(x=1050000,y=1100000," Coefficient of variation")
-plot(density_pixels_OSFL["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+plot(density_pixels_OSFL["CVs"],col= colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5),  what = "scale", axis.pos = 1)
 
 
 
@@ -387,12 +394,12 @@ plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)),zlim=c(0,10
 plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)))
 
 layout(matrix(1:4, 2, 2), heights = c(8,1))
-plot(density_pixels_RUBL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,2))
+plot(density_pixels_RUBL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.02))
 text(x=1050000,y=1100000,"Density of singing males (per ha)")
-plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,2), what = "scale", axis.pos = 1)
-plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)),  what="image")
+plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.02),  what = "scale", axis.pos = 1)
+plot(density_pixels_RUBL["CVs"], col=colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5),  what="image")
 text(x=1050000,y=1100000," Coefficient of variation")
-plot(density_pixels_RUBL["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+plot(density_pixels_RUBL["CVs"], col=colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5),  what = "scale", axis.pos = 1)
 
 writeRaster(raster(density_pixels_RUBL["density"]),filename = "predsRUBL300km",prj=TRUE,  format = "GTiff",overwrite=T)
 writeRaster(raster(density_pixels_RUBL["CVs"]),filename = "predsRUBL300km_CVs",prj=TRUE,  format = "GTiff",overwrite=T)
@@ -409,17 +416,41 @@ plot(density_pixels_CONI["CVs"], col=rev(inferno(250)))
 
 
 layout(matrix(1:4, 2, 2), heights = c(8,1))
-plot(density_pixels_CONI["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.8))
+plot(density_pixels_CONI["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.008))
 text(x=1050000,y=1100000,"Relative density (individuals per ha)")
-plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.8), what = "scale", axis.pos = 1)
-plot(density_pixels_CONI["CVs"], col=rev(inferno(250)),  what="image")
+plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.008), what = "scale", axis.pos = 1)
+plot(density_pixels_CONI["CVs"], col=colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250],zlim=c(0,3.5),  what="image")
 text(x=1050000,y=1100000," Coefficient of variation")
-plot(density_pixels_CONI["CVs"], col=rev(inferno(250)),  what = "scale", axis.pos = 1)
+plot(density_pixels_CONI["CVs"],col=colorRampPalette(rev(brewer.pal(9,"RdYlBu")))(250)[76:250], zlim=c(0,3.5),  what = "scale", axis.pos = 1)
 
 writeRaster(raster(density_pixels_CONI["density"]),filename = "predsCONI500km",prj=TRUE,  format = "GTiff",overwrite=T)
 writeRaster(raster(density_pixels_CONI["CVs"]),filename = "predsCONI500km_CVs",prj=TRUE,  format = "GTiff",overwrite=T)
 #summary(density_pixels_CONI$density)
 #plot(density_pixels_CONI$density)
+
+# a summary figure with the 4 density maps:
+layout(matrix(1:8, 4, 2), heights = c(7,1,7,1))
+par(mar=c(1, 1, 0, 0),oma=c(0,0,0,0))
+plot(density_pixels_CAWA["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.12))
+#text(x=1050000,y=1117000,"Canada Warbler")
+#text(x=1050000,y=1105000,"Density of singing males (per ha)")
+plot(density_pixels_CAWA["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.12), what = "scale", axis.pos = 1,scale.shrink=0.5)
+
+plot(density_pixels_OSFL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.07))
+#text(x=1050000,y=1117000,"Olive-sided Flycatcher")
+#text(x=1050000,y=1105000,"Density of singing males (per ha)")
+plot(density_pixels_OSFL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.07), what = "scale", axis.pos = 1,scale.shrink=0.5)
+
+plot(density_pixels_RUBL["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.02))
+#text(x=1050000,y=1117000,"Rusty Blackbird")
+#text(x=1050000,y=1105000,"Density of singing males (per ha)")
+plot(density_pixels_RUBL["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.02),  what = "scale", axis.pos = 1,scale.shrink=0.5)
+
+plot(density_pixels_CONI["density"],  what="image",col=rev(viridis(250, end=0.96)), zlim=c(0,0.008))
+#text(x=1050000,y=1117000,"Common Nighthawk")
+#text(x=1050000,y=1105000,"Relative density (individuals per ha)")
+plot(density_pixels_CONI["density"], col=rev(viridis(250, end=0.96)), zlim=c(0,0.008), what = "scale", axis.pos = 1,scale.shrink=0.5)
+
 
 # what is the land cover of grid cells with highest CVs:
 lc_highCV_CAWA<-points_pred_CAWA$HAB_NALC1[which(points_pred_CAWA$CVs>quantile(points_pred_CAWA$CVs, probs=0.90))]
@@ -527,10 +558,10 @@ plot_lc_dens<-function(preddf,modlistbuffer,response.density=TRUE){
       geom_errorbar(aes(ymin=density-sd, ymax=density+sd),
                     width=.2,                    # Width of the error bars
                     position=position_dodge(.9)) +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1,size=15,face="bold", colour = magma(n = length(levels(sumgg$z)),begin = 0.2, end=0.8)[sort(sumgg$z)]),panel.background = element_rect(fill = "white", colour = "grey50"),axis.text.y=element_text(size=12,face="bold"),axis.title=element_text(size=12,face="bold"))+
+      theme(axis.text.x = element_text(angle = 90, hjust = 1,size=15,face="bold", colour = cividis(n = length(levels(sumgg$z)), end=0.9)[sort(sumgg$z)]),panel.background = element_rect(fill = "white", colour = "grey50"),axis.text.y=element_text(size=12,face="bold"),axis.title=element_text(size=12,face="bold"))+
       xlab("Land cover class") + ylab("Density of singing males (per ha)")+
-      labs(fill = "Class grouping")+
-      scale_fill_viridis(discrete=TRUE, begin = 0.2, end=0.8, guide=F,option = "magma") 
+      labs(fill = "Class grouping") +
+      scale_fill_viridis(discrete=TRUE,  end=0.9, guide=F,option = "cividis") 
   }
   else{
     ggplot(sumgg,aes(x=HAB_NALC1,y=density, fill=z))+
@@ -538,10 +569,10 @@ plot_lc_dens<-function(preddf,modlistbuffer,response.density=TRUE){
       geom_errorbar(aes(ymin=density-sd, ymax=density+sd),
                     width=.2,                    # Width of the error bars
                     position=position_dodge(.9)) +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1,size=15,face="bold", colour = magma(n = length(levels(sumgg$z)),begin = 0.2, end=0.9)[sort(sumgg$z)]),panel.background = element_rect(fill = "white", colour = "grey50"),axis.text.y=element_text(size=12,face="bold"),axis.title=element_text(size=12,face="bold"))+
+      theme(axis.text.x = element_text(angle = 90, hjust = 1,size=15,face="bold", colour = cividis(n = length(levels(sumgg$z)), end=0.9)[sort(sumgg$z)]),panel.background = element_rect(fill = "white", colour = "grey50"),axis.text.y=element_text(size=12,face="bold"),axis.title=element_text(size=12,face="bold"))+
       xlab("Land cover class") + ylab(" Relative density (per ha)")+
       labs(fill = "Class grouping")+
-      scale_fill_viridis(discrete=TRUE, begin = 0.25, end=0.75, guide=F,option = "magma") 
+      scale_fill_viridis(discrete=TRUE,  end=0.9, guide=F,option = "cividis") 
     
   }
 }
