@@ -9,6 +9,8 @@ library(blockCV)
 library(gbm)
 library(viridis)
 library(beepr)
+library(sp)
+library(rgdal)
 load("D:/MCFN/BRT outputs/out1.RData")
 
 #load data ####
@@ -88,6 +90,18 @@ lapply(list4$datcomboMCFNSS400000,function(x){nrow(subset(x,ABUND>0))})
 lapply(list4$datcomboMCFNSS450000,function(x){nrow(subset(x,ABUND>0))})
 lapply(list4$datcomboMCFNSS500000,function(x){nrow(subset(x,ABUND>0))})
 
+
+lapply(list4$datcomboMCFNSS0,nrow)
+lapply(list4$datcomboMCFNSS50000,nrow)
+lapply(list4$datcomboMCFNSS100000,nrow)
+lapply(list4$datcomboMCFNSS150000,nrow)
+lapply(list4$datcomboMCFNSS200000,nrow)
+lapply(list4$datcomboMCFNSS250000,nrow)
+lapply(list4$datcomboMCFNSS300000,nrow)
+lapply(list4$datcomboMCFNSS350000,nrow)
+lapply(list4$datcomboMCFNSS400000,nrow)
+lapply(list4$datcomboMCFNSS450000,nrow)
+lapply(list4$datcomboMCFNSS500000,nrow)
 # extend prediction stack for better plotting
 pred_MCFN_mask.ext<-extend(pred_MCFN_mask,100)
 
@@ -499,9 +513,8 @@ compCVstats<- function(modlist, species){
   df5[,2]<-unlist(lapply(lsmod,function(x){(x$self.statistics$null - x$cv.statistics$deviance.mean)/x$self.statistics$null}))
   df5[,3]<-unlist(lapply(lsmod,function(x){x$cv.statistics$deviance.se/x$self.statistics$null}))
   k5<-ggplot(df5, aes(buffer,deviance.explained,ymin=deviance.explained-se,ymax=deviance.explained+se))
-  k5+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df5[,1]))/1000)+ylab("Deviance explained")
-  ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_deviance_explained.pdf"))
-  
+  p1<-k5+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df5[,1]))/1000)+ylab("Deviance explained")
+  #ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_deviance_explained.pdf"))
   
   # Correlation
   df2<-as.data.frame(matrix(nrow=length(lsmod),ncol=3))
@@ -511,8 +524,8 @@ compCVstats<- function(modlist, species){
   df2[,2]<-unlist(lapply(lsmod,function(x){x$cv.statistics$correlation.mean}))
   df2[,3]<-unlist(lapply(lsmod,function(x){x$cv.statistics$correlation.se}))
   k2<-ggplot(df2, aes(buffer,correlation,ymin=correlation-se,ymax=correlation+se))
-  k2+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df2[,1]))/1000)+ylab("Correlation")
-  ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_correlation.pdf"))
+  p2<-k2+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df2[,1]))/1000)+ylab("Correlation")
+  #ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_correlation.pdf"))
   
   # Calibration:  The first two statistics were the estimated intercepts and slopes of linear regression models of predictions against observations. The intercept measures the magnitude and direction of bias, with values close to 0 indicating low or no bias. The slope yields information about the consistency in the bias as a function of the mean, with a value of 1 indicating a consistent bias if the intercept is a nonzero value.
   ## intercept
@@ -523,8 +536,8 @@ compCVstats<- function(modlist, species){
   df3[,2]<-unlist(lapply(lsmod,function(x){x$cv.statistics$calibration.mean[1]}))
   df3[,3]<-unlist(lapply(lsmod,function(x){x$cv.statistics$calibration.se[1]}))
   k3<-ggplot(df3, aes(buffer,calibration.intercept,ymin=calibration.intercept-se,ymax=calibration.intercept+se))+ylab("Calibration intercept")
-  k3+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df3[,1]))/1000)
-  ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_calibration.intercept.pdf"))
+  p3<-k3+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df3[,1]))/1000)
+  #ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_calibration.intercept.pdf"))
   
   ## slope
   df4<-as.data.frame(matrix(nrow=length(lsmod),ncol=3))
@@ -534,14 +547,20 @@ compCVstats<- function(modlist, species){
   df4[,2]<-unlist(lapply(lsmod,function(x){x$cv.statistics$calibration.mean[2]}))
   df4[,3]<-unlist(lapply(lsmod,function(x){x$cv.statistics$calibration.se[2]}))
   k4<-ggplot(df4, aes(buffer,calibration.slope,ymin=calibration.slope-se,ymax=calibration.slope+se))
-  k4+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df4[,1]))/1000)+ylab("Calibration slope")
-  ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_calibration.slope.pdf"))
+  p4<-k4+geom_pointrange()+xlab("Buffer distance (km)")+scale_x_discrete(labels=as.numeric(levels(df4[,1]))/1000)+ylab("Calibration slope")
+  #ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_calibration.slope.pdf"))
   
+  p5<-grid.arrange(p1,p2,p3,p4,nrow=2,ncol=2)
+  ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_metrics.png"),plot=p5,width=16,height=16,units="cm")
+  
+  #p5<-grid.arrange(p3,p4,nrow=1,ncol=2)
+  #ggsave(paste0("D:/MCFN/BRT outputs/", species, "/",species,"_CV_metrics.png"),plot=p5,width=16,height=8,units="cm")
 }
 
 compCVstats(list5,"CAWA")
 compCVstats(list5,"OSFL")
 compCVstats(list5,"CONI")
+compCVstats(list5,"RUBL")
 
 # Buffer0 model has very high calibration values , cannot distinguish values of other buffers in plot. re-run without buff0
 list6<-list5
@@ -707,9 +726,9 @@ plot_preds<-function(species,buffer,modlist=list5,addpoints=T,SD=FALSE, CV=TRUE)
   png(file=paste0("D:/MCFN/BRT outputs/",species,"/preds_",species,"_",buffer,".png"), height=600, width=850)
   par(cex.main=1.8, mfcol=c(1,1), oma=c(0,0,0,0))
   par(mar=c(0,0,5,0))
-  plot(rast, col=viridis(15)[15], axes=TRUE, legend=FALSE, main=paste0(species," ",as.numeric(buffer)/1000," Km buffer"))
+  plot(rast, col=viridis(15)[15], axes=FALSE,box=FALSE, legend=FALSE, main=paste0(species," ",as.numeric(buffer)/1000," Km buffer"))
   
-  plot(rast, col=viridis(15), zlim=c(0,max), axes=T, main=species, add=TRUE, legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.83,0.87), axis.args=list(cex.axis=1.2))
+  plot(rast, col=viridis(15), zlim=c(0,max), axes=FALSE,box=FALSE, main=species, add=TRUE, legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.83,0.87), axis.args=list(cex.axis=1.2))
   text(1170000,6980000,"Potential density (males/ha)", cex=1.3)
 
   if(addpoints==TRUE){
@@ -733,7 +752,7 @@ plot_preds<-function(species,buffer,modlist=list5,addpoints=T,SD=FALSE, CV=TRUE)
   }
   dev.off()
   
-  magma2 <- colorRampPalette(magma(15), space="Lab", bias=2)
+  magma2 <- colorRampPalette(rev(magma(15)), space="Lab", bias=2)
   
   if (SD==TRUE){  
     SD<-raster(paste0("D:/MCFN/BRT outputs/",species,"/buffer_",buffer,"m/confint/SE.tif"))
@@ -742,8 +761,8 @@ plot_preds<-function(species,buffer,modlist=list5,addpoints=T,SD=FALSE, CV=TRUE)
     png(file=paste0("D:/MCFN/BRT outputs/",species,"/SE_",species,"_",buffer,".png"), height=600, width=850)
     par(cex.main=1.8, mfcol=c(1,1), oma=c(0,0,0,0))
     par(mar=c(0,0,5,0))
-    plot(SD_ext, col=magma(15)[15], axes=TRUE, legend=FALSE, main=paste0(species," ",as.numeric(buffer)/1000," Km buffer"))
-    plot(SD_ext, col=magma(15), axes=T,  main=paste0(species," ",buffer,"m buffer SD"), legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.83,0.87), axis.args=list(cex.axis=1.2),add=T)
+    plot(SD_ext, col=rev(magma(15))[15], axes=TRUE, legend=FALSE, main=paste0(species," ",as.numeric(buffer)/1000," Km buffer"))
+    plot(SD_ext, col=rev(magma(15)), axes=T,  main=paste0(species," ",buffer,"m buffer SD"), legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.83,0.87), axis.args=list(cex.axis=1.2),add=T)
     text(1170000,6980000,"Density SE", cex=1.3)
     dev.off()
     
@@ -764,8 +783,8 @@ plot_preds<-function(species,buffer,modlist=list5,addpoints=T,SD=FALSE, CV=TRUE)
     png(file=paste0("D:/MCFN/BRT outputs/",species,"/CV_",species,"_",buffer,".png"), height=600, width=850)
     par(cex.main=1.8, mfcol=c(1,1), oma=c(0,0,0,0))
     par(mar=c(0,0,5,0))
-    plot(CV_ext, col=magma(15)[15], axes=TRUE, legend=FALSE, main=paste0(species," ",as.numeric(buffer)/1000," Km buffer"))
-    plot(CV_ext, col=magma(15),  axes=T,  main=paste0(species," ",buffer,"m buffer CV"), legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.83,0.87),axis.args=list(cex.axis=1.2),add=T)
+    plot(CV_ext, col=rev(magma(15))[15], axes=TRUE, legend=FALSE, main=paste0(species," ",as.numeric(buffer)/1000," Km buffer"))
+    plot(CV_ext, col=rev(magma(15)),  axes=T,  main=paste0(species," ",buffer,"m buffer CV"), legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.83,0.87),axis.args=list(cex.axis=1.2),add=T)
     text(1170000,6980000,"Density CV", cex=1.3)
     dev.off()
     
@@ -782,11 +801,87 @@ plot_preds<-function(species,buffer,modlist=list5,addpoints=T,SD=FALSE, CV=TRUE)
 }
 
 plot_preds("CAWA","200000",SD=TRUE,CV=TRUE)
-beep(sound = 4, expr = NULL) 
 plot_preds("OSFL","100000",SD=TRUE,CV=TRUE)
-plot_preds("CONI","400000",SD=TRUE,CV=TRUE)
-plot_preds("RUBL","450000",SD=TRUE,CV=TRUE)
+plot_preds("CONI","450000",SD=TRUE,CV=TRUE)
+plot_preds("RUBL","500000",SD=TRUE,CV=TRUE)
 beep(sound = 4, expr = NULL) 
+
+
+
+plot_preds2<-function(species,buffer,modlist=list5,addpoints=T, wide=F){
+  lsmod<-modlist[[species]]
+  bufferlist<-c("0","50000","100000","150000","200000","250000","300000","350000","400000","450000","500000")
+  mod<-lsmod[[which(bufferlist==buffer)]]
+  
+  rast<-predict(pred_MCFN_mask.ext,
+                mod,
+                type = "response",
+                n.trees = mod$n.trees)
+  
+  prev <- cellStats(rast, 'mean')    
+  max <- 3*prev
+  
+  SD<-raster(paste0("D:/MCFN/BRT outputs/",species,"/buffer_",buffer,"m/confint/SE.tif"))
+  SD_ext<-extend(SD,100)
+  
+  if(wide==TRUE){
+    height<-600
+    width<-850*2
+    mat<-matrix(c(1,2), 1, 2)
+  }
+  
+  if(wide==F){
+    height<-600*2
+    width<-850
+    mat<-matrix(c(1,2), 2, 1)
+  }
+  
+  png(file=paste0("D:/MCFN/BRT outputs/",species,"/preds_and_SD",species,"_",buffer,".png"), height=height, width=width)
+  layout(mat)
+  par(cex.main=1.8, oma=c(0,0,0,0),mar=c(0,0,0,0))
+  
+  plot(rast, col=rev(viridis(15))[15], axes=F, legend=FALSE, main=NULL )
+  
+  plot(rast, col=rev(viridis(15)), zlim=c(0,max), axes=F, main=NULL,  add=TRUE, legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.92,0.96), axis.args=list(cex.axis=1.2))
+  text(1160000,6980000,"Potential density (males/ha)", cex=1.3)
+  text(710000,7000000, "A", cex=1.3, font=2)
+  if(addpoints==TRUE){
+    
+    speclist<-c("CAWA","OSFL","RUBL","CONI")
+    
+    dat<-list4$datcomboMCFNSS0
+    datcombo<-dat[[which(speclist==species)]]
+    if(mean(datcombo$ABUND)==0){
+      datcombo<-dat[[which(speclist=="CAWA")]]
+      data_sp <-SpatialPointsDataFrame(coords = datcombo[,c("X","Y")], data = datcombo, proj4string = LCC)
+      points(data_sp$X, data_sp$Y, cex = 1, col=1, pch=4)
+      
+    }
+    else{
+      data_sp <-SpatialPointsDataFrame(coords = datcombo[,c("X","Y")], data = datcombo, proj4string = LCC)
+      points(data_sp$X[data_sp$ABUND==0], data_sp$Y[data_sp$ABUND==0], cex = 1, col=1, pch=4)
+      points(data_sp$X[data_sp$ABUND>0], data_sp$Y[data_sp$ABUND>0], cex = 1, col=2, pch=4)
+    }
+    
+  }
+  
+  plot(SD_ext, col=rev(magma(15))[15], axes=F, legend=FALSE, main=NULL)
+  plot(SD_ext, col=rev(magma(15)), axes=F,  main=NULL,  legend.width=1.5, horizontal = TRUE, smallplot = c(0.65,0.90,0.92,0.96), axis.args=list(cex.axis=1.2),add=T)
+  text(1170000,6980000,"Density SD", cex=1.3)
+  text(710000,7000000, "B", cex=1.3, font=2)
+  
+  dev.off()
+  
+  
+  
+}
+plot_preds2("CAWA","200000")
+beep(sound = 4, expr = NULL) 
+plot_preds2("OSFL","100000")
+plot_preds2("CONI","450000")
+plot_preds2("RUBL","500000")
+beep(sound = 4, expr = NULL) 
+
 
 save.image("D:/MCFN/BRT outputs/out1.RData")
 beep(sound = 4, expr = NULL) 
@@ -810,32 +905,63 @@ rast<-predict(pred_MCFN_mask.ext,
               type = "response",
               n.trees = mod$n.trees)
 
+## log mean density boxplots
 dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
 dens<-dens[!is.na(dens),]
 dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
-medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median, na.rm=T)
+dens<-dens[!is.na(dens$class),]
+#png(filename = paste0("D:/MCFN/BRT outputs/CAWA/logmean_boxplots.png"), height=600, width=850)
+p1<-ggplot(dens,aes(x=class,y=log(Density)))+
+  #geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
+  #geom_errorbar(aes(ymin=mean.Density-sd.Density,ymax=mean.Density-sd.Density),width=0.2)+
+  geom_boxplot(aes(fill=class))+
+  xlab("Land cover class")+
+  ylab("Log mean density (males/ha)")+
+  theme(legend.position = "none", axis.title.x = element_blank())+
+  geom_text(x=9.3,y=0, label="A")
+#dev.off()
 
-medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=function(x){quantile(x,0.75,na.rm=T)})
-
+## median density barplots w/ variable width
+dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
+dens<-dens[!is.na(dens),]
+dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
+medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median,na.rm=T)
 areaHab<-aggregate(dens$Density,by=list(dens$class), FUN=function(x){6.25* length(x)})
-hab_dens<-data.frame(Habitat = medianDens$Group.1,Median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x))
+hab_dens<-data.frame(Habitat = medianDens$Group.1,median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x)) # use median instead
 hab_dens$area2<-hab_dens$areaHab
 hab_dens$area2[which(hab_dens$areaHab<0.01)]<-0.01
 hab_dens$labels<-as.character(round(hab_dens$areaHab,digits=2))
 hab_dens$labels[which(hab_dens$areaHab<0.01)]<-"<0.01"
 
-# agriculture has only 4 grid cells, in which density is overpredicted. will replace them with 75% quantile value
-quantile(dens$Density,0.75,na.rm=T)
-hab_dens$Median.Density[1]<-quantile(dens$Density,0.75,na.rm=T)
-
-png(filename = paste0("D:/MCFN/BRT outputs/CAWA/lc_mean_denspreds.png"), height=600, width=850)
-ggplot(hab_dens,aes(x=Habitat,y=Median.Density))+
+p2<-ggplot(hab_dens,aes(x=Habitat,y=median.Density))+
   geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
-  xlab("Land cover type")+
-  ylab("Mean density (males/ha)")+
+  xlab("Land cover class")+
+  ylab("Median density (males/ha)")+
   theme(legend.position = "none")+
-  geom_text(aes(label=hab_dens$labels),nudge_y = 0.0005,size=3.5)
-dev.off()
+  geom_text(aes(label=hab_dens$labels),nudge_y = 0.01,size=2)+
+  geom_text(x=9,y=0.18,label="B")
+
+hab_dens2<-hab_dens[-1,] #This to plot all habitats except agriculture
+
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+
+p3<-ggplot(hab_dens2,aes(x=Habitat,y=median.Density))+
+  geom_bar(aes(fill=Habitat),width=hab_dens2$area2, stat="identity")+
+  scale_fill_manual(values=gg_color_hue(9)[-1])+
+  xlab("Land cover class")+
+  ylab("Median density (males/ha)")+
+  theme(legend.position = "none")+
+  geom_text(aes(label=hab_dens2$labels),nudge_y = 0.0015,size=2)+
+  geom_text(x=8,y=0.022,label="C")
+
+p4<-grid.arrange(p1,p2,p3,ncol=1)
+
+ggsave(paste0("D:/MCFN/BRT outputs/CAWA/habitat_box_and_bar_plots.png"),plot=p4,width=16,height=20,units="cm")
+
 
 #OSFL
 mod<-list5$OSFL$OSFL_buffer_100000m
@@ -843,83 +969,212 @@ rast<-predict(pred_MCFN_mask.ext,
               mod,
               type = "response",
               n.trees = mod$n.trees)
+## log mean density boxplots
 dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
 dens<-dens[!is.na(dens),]
 dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
-medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median, na.rm=T)
+dens<-dens[!is.na(dens$class),]
+#png(filename = paste0("D:/MCFN/BRT outputs/OSFL/logmean_boxplots.png"), height=600, width=850)
+p1<-ggplot(dens,aes(x=class,y=log(Density)))+
+  #geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
+  #geom_errorbar(aes(ymin=mean.Density-sd.Density,ymax=mean.Density-sd.Density),width=0.2)+
+  geom_boxplot(aes(fill=class))+
+  xlab("Land cover class")+
+  ylab("Log mean density (males/ha)")+
+  theme(legend.position = "none", axis.title.x = element_blank())+
+  geom_text(x=9.3,y=0, label="A")
+#dev.off()
+
+## median density barplots w/ variable width
+dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
+dens<-dens[!is.na(dens),]
+dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
+medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median,na.rm=T)
 areaHab<-aggregate(dens$Density,by=list(dens$class), FUN=function(x){6.25* length(x)})
-hab_dens<-data.frame(Habitat = medianDens$Group.1,Median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x))
+hab_dens<-data.frame(Habitat = medianDens$Group.1,median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x)) # use median instead
 hab_dens$area2<-hab_dens$areaHab
 hab_dens$area2[which(hab_dens$areaHab<0.01)]<-0.01
 hab_dens$labels<-as.character(round(hab_dens$areaHab,digits=2))
 hab_dens$labels[which(hab_dens$areaHab<0.01)]<-"<0.01"
-
-png(filename = paste0("D:/MCFN/BRT outputs/OSFL/lc_mean_denspreds.png"), height=600, width=850)
-ggplot(hab_dens,aes(x=Habitat,y=Median.Density))+
+#png(filename = paste0("D:/MCFN/BRT outputs/OSFL/lc_median_denspreds.png"), height=600, width=850)
+p2<-ggplot(hab_dens,aes(x=Habitat,y=median.Density))+
   geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
-  xlab("Land cover type")+
-  ylab("Mean density (males/ha)")+
+  xlab("Land cover class")+
+  ylab("Median density (males/ha)")+
   theme(legend.position = "none")+
-  geom_text(aes(label=hab_dens$labels),nudge_y = 0.0002,size=3.5)
-dev.off()
+  geom_text(aes(label=hab_dens$labels),nudge_y = 0.0002,size=2)+
+  geom_text(x=9.35,y=0.0042,label="B")
+#dev.off()
+
+p3<-grid.arrange(p1,p2,ncol=1)
+
+ggsave(paste0("D:/MCFN/BRT outputs/OSFL/habitat_box_and_bar_plots.png"),plot=p3,width=16,height=20,units="cm")
 
 # CONI
-mod<-list5$OSFL$OSFL_buffer_400000m
+mod<-list5$CONI$CONI_buffer_450000m
 rast<-predict(pred_MCFN_mask.ext,
               mod,
               type = "response",
               n.trees = mod$n.trees)
 
+## log mean density boxplots
 dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
 dens<-dens[!is.na(dens),]
 dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
-medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median, na.rm=T)
+dens<-dens[!is.na(dens$class),]
+#png(filename = paste0("D:/MCFN/BRT outputs/CONI/logmean_boxplots.png"), height=600, width=850)
+p1<-ggplot(dens,aes(x=class,y=log(Density)))+
+  #geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
+  #geom_errorbar(aes(ymin=mean.Density-sd.Density,ymax=mean.Density-sd.Density),width=0.2)+
+  geom_boxplot(aes(fill=class))+
+  xlab("Land cover class")+
+  ylab("Log mean relative density (males/ha)")+
+  theme(legend.position = "none", axis.title.x = element_blank())+
+  geom_text(x=9.3,y=0, label="A")
+#dev.off()
+
+## median density barplots w/ variable width
+dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
+dens<-dens[!is.na(dens),]
+dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
+medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median,na.rm=T)
 areaHab<-aggregate(dens$Density,by=list(dens$class), FUN=function(x){6.25* length(x)})
-hab_dens<-data.frame(Habitat = medianDens$Group.1,Median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x))
+hab_dens<-data.frame(Habitat = medianDens$Group.1,median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x)) # use median instead
 hab_dens$area2<-hab_dens$areaHab
 hab_dens$area2[which(hab_dens$areaHab<0.01)]<-0.01
 hab_dens$labels<-as.character(round(hab_dens$areaHab,digits=2))
 hab_dens$labels[which(hab_dens$areaHab<0.01)]<-"<0.01"
-
-png(filename = paste0("D:/MCFN/BRT outputs/CONI/lc_mean_denspreds.png"), height=600, width=850)
-ggplot(hab_dens,aes(x=Habitat,y=Median.Density))+
+#png(filename = paste0("D:/MCFN/BRT outputs/CONI/lc_median_denspreds.png"), height=600, width=850)p2<-ggplot(hab_dens,aes(x=Habitat,y=median.Density))+
   geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
-  xlab("Land cover type")+
-  ylab("Mean density (males/ha)")+
+  xlab("Land cover class")+
+  ylab("Median relative density (males/ha)")+
   theme(legend.position = "none")+
-  geom_text(aes(label=hab_dens$labels),nudge_y = 0.0002,size=3.5)
-dev.off()
+  geom_text(aes(label=hab_dens$labels),nudge_y = 0.00005,size=2)+
+  geom_text(x=9.3,y=0.0015,label="B")
+#dev.off()
+
+p3<-grid.arrange(p1,p2,ncol=1)
+
+ggsave(paste0("D:/MCFN/BRT outputs/CONI/habitat_box_and_bar_plots.png"),plot=p3,width=16,height=20,units="cm")
 
 # RUBL
-mod<-list5$RUBL$RUBL_buffer_450000m
+mod<-list5$RUBL$RUBL_buffer_500000m
 rast<-predict(pred_MCFN_mask.ext,
               mod,
               type = "response",
               n.trees = mod$n.trees)
 
+## log mean density boxplots
 dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
 dens<-dens[!is.na(dens),]
 dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
-medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median, na.rm=T)
+dens<-dens[!is.na(dens$class),]
+#png(filename = paste0("D:/MCFN/BRT outputs/RUBL/logmean_boxplots.png"), height=600, width=850)
+p1<-ggplot(dens,aes(x=class,y=log(Density)))+
+  #geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
+  #geom_errorbar(aes(ymin=mean.Density-sd.Density,ymax=mean.Density-sd.Density),width=0.2)+
+  geom_boxplot(aes(fill=class))+
+  xlab("Land cover class")+
+  ylab("Log mean density (males/ha)")+
+  theme(legend.position = "none", axis.title.x = element_blank())+
+  geom_text(x=9.3,y=-4.5, label="A")
+#dev.off()
+
+## median density barplots w/ variable width
+dens<-data.frame(Value=getValues(MCFN_LCC),Density=getValues(rast))
+dens<-dens[!is.na(dens),]
+dens$class<-ltnalc$Label[match(dens$Value, ltnalc$Value)]
+medianDens<-aggregate(dens$Density,by=list(dens$class), FUN=median,na.rm=T)
 areaHab<-aggregate(dens$Density,by=list(dens$class), FUN=function(x){6.25* length(x)})
-hab_dens<-data.frame(Habitat = medianDens$Group.1,Median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x))
+hab_dens<-data.frame(Habitat = medianDens$Group.1,median.Density=medianDens$x,areaHab=areaHab$x/sum(areaHab$x)) # use median instead
 hab_dens$area2<-hab_dens$areaHab
 hab_dens$area2[which(hab_dens$areaHab<0.01)]<-0.01
 hab_dens$labels<-as.character(round(hab_dens$areaHab,digits=2))
 hab_dens$labels[which(hab_dens$areaHab<0.01)]<-"<0.01"
-
-png(filename = paste0("D:/MCFN/BRT outputs/RUBL/lc_mean_denspreds.png"), height=600, width=850)
-ggplot(hab_dens,aes(x=Habitat,y=Median.Density))+
+#png(filename = paste0("D:/MCFN/BRT outputs/RUBL/lc_median_denspreds.png"), height=600, width=850)
+p2<-ggplot(hab_dens,aes(x=Habitat,y=median.Density))+
   geom_bar(aes(fill=Habitat),width=hab_dens$area2, stat="identity")+
-  xlab("Land cover type")+
-  ylab("Mean density (males/ha)")+
+  xlab("Land cover class")+
+  ylab("Median density (males/ha)")+
   theme(legend.position = "none")+
-  geom_text(aes(label=hab_dens$labels),nudge_y = 0.0005,size=3.5)
-dev.off()
+  geom_text(aes(label=hab_dens$labels),nudge_y = 0.0001,size=2)+
+  geom_text(x=9.3,y=0.0037,label="B")
+#dev.off()
+
+p3<-grid.arrange(p1,p2,ncol=1)
+
+ggsave(paste0("D:/MCFN/BRT outputs/RUBL/habitat_box_and_bar_plots.png"),plot=p3,width=16,height=20,units="cm")
 
 
 save.image("D:/MCFN/BRT outputs/out1.RData")
 beep(sound = 4, expr = NULL) 
+
+
+# Plot study area and buffers ####
+MCFNhome_0<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff0")
+MCFNhome_50000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff50000")
+MCFNhome_100000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff100000")
+MCFNhome_150000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff150000")
+MCFNhome_200000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff200000")
+MCFNhome_250000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff250000")
+MCFNhome_300000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff300000")
+MCFNhome_350000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff350000")
+MCFNhome_400000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff400000")
+MCFNhome_450000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff450000")
+MCFNhome_500000<-readOGR(dsn="D:/MCFN/buffers",layer="MCFNBuff500000")
+
+MCFNhomePTS_0<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff0")
+MCFNhomePTS_50000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff50000")
+MCFNhomePTS_100000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff100000")
+MCFNhomePTS_150000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff150000")
+MCFNhomePTS_200000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff200000")
+MCFNhomePTS_250000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff250000")
+MCFNhomePTS_300000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff300000")
+MCFNhomePTS_350000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff350000")
+MCFNhomePTS_400000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff400000")
+MCFNhomePTS_450000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff450000")
+MCFNhomePTS_500000<-readOGR(dsn="D:/MCFN/buffers",layer="BAM_ptswBuff500000")
+
+
+MCFNBuffList<-list(MCFNhome_0,MCFNhome_50000,MCFNhome_100000,MCFNhome_150000,MCFNhome_200000,MCFNhome_250000,MCFNhome_300000,MCFNhome_350000,MCFNhome_400000,MCFNhome_450000,MCFNhome_500000)
+MCFNBuffptsList<-list(MCFNhomePTS_0,MCFNhomePTS_50000,MCFNhomePTS_100000,MCFNhomePTS_150000,MCFNhomePTS_200000,MCFNhomePTS_250000,MCFNhomePTS_300000,MCFNhomePTS_350000,MCFNhomePTS_400000,MCFNhomePTS_450000,MCFNhomePTS_500000)
+
+MCFNBuffList<-lapply(MCFNBuffList,function(x){spTransform(x,CRSobj = LCC)})
+MCFNBuffList[[11]]
+
+
+NALCC2005<-raster("M:/DataStuff/SpatialData/LCC05_NALCMS2010/Land_Cover_MXD/NA_LandCover_2005/data/NA_LandCover_2005/NA_LandCover_2005_LCC.img")
+m <- c(1:19,rep(0,17),1,0)
+rclmat <- matrix(m, ncol=2, byrow=F)
+wat<-reclassify(NALCC2005,rclmat)
+wat<- crop(wat,MCFNBuffList[[11]])
+
+
+can0<-getData('GADM', country="CAN", level=0)
+can0<-spTransform(can0,LCC)
+can1<-getData('GADM', country="CAN", level=1)
+can1<-spTransform(can1,LCC)
+
+pal<-colorRampPalette(c("white","blue"))
+
+n<-2
+png(file=paste0("D:/MCFN/BRT outputs/buffers_and_pts.png"), height=n*560, width=n*600,res=144,antialias = "cleartype")
+par(oma=c(0,0,0,0),mar=c(0,0,0,0))
+
+plot(wat, col=pal(7),axes=F,legend=F, alpha=0.35,box=F)
+plot(MCFNhome_500000, axes=F, add=T)
+plot(MCFNhome_0,add=T, col=adjustcolor("lightgrey",alpha.f = 0.65))
+lapply(MCFNBuffList,plot,add=T)
+plot(MCFNBuffptsList[[11]], add=T,pch=1,col=2,cex=0.5)
+#coords_lists<-locator(11)
+text(coords_lists$x,coords_lists$y,labels=unlist(lapply(MCFNBuffptsList,function(x){length(x$SS)})),cex=0.7,font=2)
+#coords_lists2<-locator(11)
+text(coords_lists2$x,coords_lists2$y,labels=as.character(c(0,50,100,150,200,250,300,350,400,450,500)),cex=0.7,col=4,font=2)
+box()
+plot(can0, add=T)
+plot(can1, add=T)
+dev.off()
+
 
 # Cleanup ws ####
 load("D:/MCFN/BRT outputs/out1.RData")
